@@ -6,17 +6,28 @@ from exception import AssemblerException
 class Token:
     __slots__ = 'kind', 'value', 'line_nr', 'filename'
 
-    def __init__(self, kind, value, line_nr, filename):
+    def __init__(self, kind: str, value, line_nr: int, filename: str):
         self.kind = kind
         self.value = value
         self.line_nr = line_nr
         self.filename = filename
 
-    def isA(self, kind, value=None):
+    def isA(self, kind: str, value=None) -> bool:
         if self.kind != kind:
             return False
         if value is not None and self.value.upper() != value.upper():
             return False
+        return True
+
+    def match(self, other: "Token") -> bool:
+        if self.kind != other.kind:
+            return False
+        if self.kind == 'ID':
+            if self.value.upper() != other.value.upper():
+                return False
+        else:
+            if self.value != other.value:
+                return False
         return True
 
     def __repr__(self) -> str:
@@ -33,8 +44,10 @@ class Tokenizer:
         ('LABEL', r':'),
         ('DIRECTIVE', r'#[A-Za-z_]+'),
         ('STRING', '[a-zA-Z]?"[^"]*"'),
+        ('FUNC', r'\.?[A-Za-z_][A-Za-z0-9_\.]*\('),
         ('ID', r'\.?[A-Za-z_][A-Za-z0-9_\.]*'),
-        ('OP', r'(?:<=)|(?:>=)|(?:==)|(?:<<)|(?:>>)|[+\-*/,\(\)<>&|\[\]]'),
+        ('CURADDR', r'@'),
+        ('OP', r'(?:<=)|(?:>=)|(?:==)|(?:<<)|(?:>>)|[+\-*/,\(\)<>&|\[\]{}]'),
         ('TOKENCONCAT', r'##'),
         ('NEWLINE', r'\n'),
         ('SKIP', r'[ \t]+'),
@@ -43,6 +56,7 @@ class Tokenizer:
 
     def __init__(self):
         self.__tokens = []
+        self.__eof = Token('EOF', '', 0, '')
 
     def add_code(self, code, *, filename="[string]") -> None:
         line_nr = 1
@@ -56,10 +70,14 @@ class Tokenizer:
             elif kind == 'HEX':
                 value = int(str(value)[1:], 16)
                 kind = 'NUMBER'
+            elif kind == 'FUNC':
+                value = value[:-1]
             elif kind == 'NEWLINE':
                 value = ""
             elif kind == 'OP':
                 kind = value
+            elif kind == 'MISMATCH':
+                raise AssemblerException(Token(kind, value, line_nr, filename), "Syntax error")
             self.__tokens.append(Token(kind, value, line_nr, filename))
             if kind == 'NEWLINE':
                 line_nr += 1
@@ -67,23 +85,23 @@ class Tokenizer:
     def prepend(self, tokens: List[Token]):
         self.__tokens = tokens + self.__tokens
 
-    def pop_raw(self) -> Optional[Token]:
+    def pop_raw(self) -> Token:
         if not self.__tokens:
-            return None
+            return self.__eof
         return self.__tokens.pop(0)
 
-    def peek(self) -> Optional[Token]:
+    def peek(self) -> Token:
         if not self.__tokens:
-            return None
+            return self.__eof
         token = self.__tokens[0]
         while len(self.__tokens) > 1 and self.__tokens[1].isA('TOKENCONCAT'):
             self.__tokens.pop(1)
             token = Token(token.kind, str(token.value) + str(self.__tokens.pop(1).value), token.line_nr, token.filename)
         return token
 
-    def pop(self) -> Optional[Token]:
+    def pop(self) -> Token:
         if not self.__tokens:
-            return None
+            return self.__eof
         token = self.peek()
         self.__tokens.pop(0)
         return token

@@ -50,17 +50,6 @@ def parse_ref(tok: Tokenizer) -> AstNode:
     return AstNode('REF', t, res, None)
 
 
-def parse_call(tok: Tokenizer) -> Tuple[str, List[AstNode]]:
-    tok.expect('(')
-    if tok.match(')'):
-        return "CALL", []
-    params = [parse_expression(tok)]
-    while tok.match(','):
-        params.append(parse_expression(tok))
-    tok.expect(')')
-    return 'CALL', params
-
-
 def parse_unary(tok: Tokenizer) -> AstNode:
     t = tok.pop()
     return AstNode(t.kind, t, parse_precedence(tok, PREC_UNARY), None)
@@ -76,6 +65,7 @@ def parse_binary(tok: Tokenizer) -> Tuple[str, AstNode]:
 EXPRESSION_RULES: Dict[str, Tuple[Callable[[Tokenizer], AstNode], Callable[[Tokenizer], Tuple[str, AstNode]], int]] = {
     'ID': (parse_value, None, PREC_NONE),
     'STRING': (parse_value, None, PREC_NONE),
+    'CURADDR': (parse_value, None, PREC_NONE),
     '&': (None, parse_binary, PREC_BITWISE_AND),
     '^': (None, parse_binary, PREC_BITWISE_XOR),
     '|': (None, parse_binary, PREC_BITWISE_OR),
@@ -95,7 +85,7 @@ EXPRESSION_RULES: Dict[str, Tuple[Callable[[Tokenizer], AstNode], Callable[[Toke
     '&&': (None, parse_binary, PREC_LOGIC_AND),
     '||': (None, parse_binary, PREC_LOGIC_OR),
     'NUMBER': (parse_value, None, PREC_NONE),
-    '(': (parse_grouping, parse_call, PREC_CALL),
+    '(': (parse_grouping, None, PREC_CALL),
     '[': (parse_ref, None, PREC_CALL),
 }
 
@@ -103,7 +93,7 @@ EXPRESSION_RULES: Dict[str, Tuple[Callable[[Tokenizer], AstNode], Callable[[Toke
 def parse_precedence(tok: Tokenizer, precedence: int) -> AstNode:
     token = tok.peek()
     if token.kind not in EXPRESSION_RULES:
-        raise AssemblerException(token, f"Unexpected {token.kind}")
+        raise AssemblerException(token, f"Unexpected {token.value}")
     prefix_rule = EXPRESSION_RULES[token.kind][0]
     if prefix_rule is None:
         raise AssemblerException(token, "Expect expression.")
@@ -118,5 +108,7 @@ def parse_precedence(tok: Tokenizer, precedence: int) -> AstNode:
     return a
 
 
-def parse_expression(tok: Tokenizer):
+def parse_expression(tokens: List[Token]) -> AstNode:
+    tok = Tokenizer()
+    tok.prepend(tokens)
     return parse_precedence(tok, PREC_ASSIGNMENT)
