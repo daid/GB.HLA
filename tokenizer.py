@@ -38,16 +38,16 @@ class Tokenizer:
     TOKEN_REGEX = re.compile('|'.join('(?P<%s>%s)' % pair for pair in [
         ('NUMBER', r'\d+(\.\d*)?'),
         ('HEX', r'\$[0-9A-Fa-f]+'),
+        ('BIN', r'%[0-1]+'),
         ('GFX', r'`[0-3]+'),
-        ('ASSIGN', r':='),
         ('COMMENT', r';[^\n]*'),
         ('LABEL', r':'),
         ('DIRECTIVE', r'#[A-Za-z_]+'),
-        ('STRING', '[a-zA-Z]?"[^"]*"'),
+        ('STRING', '"[^"]*"'),
         ('FUNC', r'\.?[A-Za-z_][A-Za-z0-9_\.]*\('),
         ('ID', r'\.?[A-Za-z_][A-Za-z0-9_\.]*'),
         ('CURADDR', r'@'),
-        ('OP', r'(?:<=)|(?:>=)|(?:==)|(?:<<)|(?:>>)|[+\-*/,\(\)<>&|\[\]{}]'),
+        ('OP', r'(?:<=)|(?:>=)|(?:==)|(?:<<)|(?:>>)|[+\-*/,\(\)<>&|\[\]{}=]'),
         ('TOKENCONCAT', r'##'),
         ('NEWLINE', r'\n'),
         ('SKIP', r'[ \t]+'),
@@ -70,12 +70,20 @@ class Tokenizer:
             elif kind == 'HEX':
                 value = int(str(value)[1:], 16)
                 kind = 'NUMBER'
+            elif kind == 'BIN':
+                value = int(str(value)[1:], 2)
+                kind = 'NUMBER'
+            elif kind == 'GFX':
+                value = int(str(value)[1:], 4)
+                kind = 'NUMBER'
             elif kind == 'FUNC':
                 value = value[:-1]
             elif kind == 'NEWLINE':
                 value = ""
             elif kind == 'OP':
                 kind = value
+            elif kind == 'STRING':
+                value = value[1:-1]
             elif kind == 'MISMATCH':
                 raise AssemblerException(Token(kind, value, line_nr, filename), "Syntax error")
             self.__tokens.append(Token(kind, value, line_nr, filename))

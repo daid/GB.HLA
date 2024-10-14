@@ -1,5 +1,5 @@
-#FUNC HIGH _value { ((_value >> 8) & 0xFF) }
-#FUNC LOW _value { ((_value >> 8) & 0xFF) }
+#FUNC HIGH _value { ((_value >> 8) & $FF) }
+#FUNC LOW _value { ((_value >> 8) & $FF) }
 #FUNC JR_OFFSET _target { _target - @ }
 #MACRO adc a, [hl] { db $8e }
 #MACRO adc a, _value { db $ce, _value }
@@ -157,21 +157,29 @@
     dw _target }
 #MACRO jp z, _target { db $ca
     dw _target }
-#MACRO jr _target { db $18, JR_OFFSET(_target) }
-#MACRO jr c, _target { db $38, JR_OFFSET(_target) }
-#MACRO jr nc, _target { db $30, JR_OFFSET(_target) }
-#MACRO jr nz, _target { db $20, JR_OFFSET(_target) }
-#MACRO jr z, _target { db $28, JR_OFFSET(_target) }
+#MACRO _jr_offset_byte _target {
+    #ASSERT (_target - @ - 1) < 128, (_target - @ - 1) >= -128, "JR offset out of range"
+    db _target - @ - 1 }
+#MACRO jr _target { db $18
+    _jr_offset_byte _target }
+#MACRO jr c, _target { db $38
+    _jr_offset_byte _target }
+#MACRO jr nc, _target { db $30
+    _jr_offset_byte _target }
+#MACRO jr nz, _target { db $20
+    _jr_offset_byte _target }
+#MACRO jr z, _target { db $28
+    _jr_offset_byte _target }
 #MACRO ld [_target], a { db $ea
     dw _target }
 #MACRO ld [_target], sp { db $08
     dw _target }
 #MACRO ld [bc], a { db $02 }
-#MACRO ld [c], a { db $e2 }
+#MACRO ldh [c], a { db $e2 }
 #MACRO ld [de], a { db $12 }
 #MACRO ld [hl], _value { db $36, _value }
-#MACRO ld [hl], a { db $22 }
-#MACRO ld [hl], a { db $32 }
+#MACRO ld [hl+], a { db $22 }
+#MACRO ld [hl-], a { db $32 }
 #MACRO ld [hl], a { db $77 }
 #MACRO ld [hl], b { db $70 }
 #MACRO ld [hl], c { db $71 }
@@ -182,10 +190,10 @@
 #MACRO ld a, [_target] { db $fa
     dw _target }
 #MACRO ld a, [bc] { db $0a }
-#MACRO ld a, [c] { db $f2 }
+#MACRO ldh a, [c] { db $f2 }
 #MACRO ld a, [de] { db $1a }
-#MACRO ld a, [hl] { db $2a }
-#MACRO ld a, [hl] { db $3a }
+#MACRO ld a, [hl+] { db $2a }
+#MACRO ld a, [hl-] { db $3a }
 #MACRO ld a, [hl] { db $7e }
 #MACRO ld a, _value { db $3e, _value }
 #MACRO ld a, a { db $7f }
@@ -204,7 +212,8 @@
 #MACRO ld b, e { db $43 }
 #MACRO ld b, h { db $44 }
 #MACRO ld b, l { db $45 }
-#MACRO ld bc, n16 { db $01 }
+#MACRO ld bc, _value { db $01
+    dw _value }
 #MACRO ld c, [hl] { db $4e }
 #MACRO ld c, _value { db $0e, _value }
 #MACRO ld c, a { db $4f }
@@ -223,7 +232,8 @@
 #MACRO ld d, e { db $53 }
 #MACRO ld d, h { db $54 }
 #MACRO ld d, l { db $55 }
-#MACRO ld de, n16 { db $11 }
+#MACRO ld de, _value { db $11
+    dw _value }
 #MACRO ld e, [hl] { db $5e }
 #MACRO ld e, _value { db $1e, _value }
 #MACRO ld e, a { db $5f }
@@ -242,8 +252,9 @@
 #MACRO ld h, e { db $63 }
 #MACRO ld h, h { db $64 }
 #MACRO ld h, l { db $65 }
-#MACRO ld hl, n16 { db $21 }
 #MACRO ld hl, sp + _offset { db $f8, _offset }
+#MACRO ld hl, _value { db $21
+    dw _value }
 #MACRO ld l, [hl] { db $6e }
 #MACRO ld l, _value { db $2e, _value }
 #MACRO ld l, a { db $6f }
@@ -254,7 +265,8 @@
 #MACRO ld l, h { db $6c }
 #MACRO ld l, l { db $6d }
 #MACRO ld sp, hl { db $f9 }
-#MACRO ld sp, n16 { db $31 }
+#MACRO ld sp, _value { db $31 
+    dw _value }
 #MACRO ldh [_target], a { db $e0
     #ASSERT HIGH(_target) == $ff
     db LOW(_target) }
@@ -385,14 +397,9 @@
 #MACRO rrc h { db $cb, $0c }
 #MACRO rrc l { db $cb, $0d }
 #MACRO rrca { db $0f }
-#MACRO rst $00 { db $c7 }
-#MACRO rst $08 { db $cf }
-#MACRO rst $10 { db $d7 }
-#MACRO rst $18 { db $df }
-#MACRO rst $20 { db $e7 }
-#MACRO rst $28 { db $ef }
-#MACRO rst $30 { db $f7 }
-#MACRO rst $38 { db $ff }
+#MACRO rst _value {
+    #ASSERT (_value & $07) == 0, _value < $40, "RST target invalid"
+    db $c7 + _value }
 #MACRO sbc a, [hl] { db $9e }
 #MACRO sbc a, _value { db $de, _value }
 #MACRO sbc a, a { db $9f }

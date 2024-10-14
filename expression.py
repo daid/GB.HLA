@@ -26,9 +26,18 @@ class AstNode:
         self.token = token
         self.left = left
         self.right = right
+    
+    def is_number(self):
+        if self.kind != 'value':
+            return False
+        if self.token.kind != 'NUMBER':
+            return False
+        return True
 
     def __repr__(self):
-        return f"<{self.kind}@{self.token.value}:{self.left},{self.right}>"
+        if self.kind == 'value':
+            return f"{self.token.value}"
+        return f"({self.left} {self.kind} {self.right})"
 
 
 def parse_value(tok: Tokenizer) -> AstNode:
@@ -38,14 +47,14 @@ def parse_value(tok: Tokenizer) -> AstNode:
 
 def parse_grouping(tok: Tokenizer) -> AstNode:
     tok.pop()
-    res = parse_expression(tok)
+    res = parse_precedence(tok, PREC_ASSIGNMENT)
     tok.expect(')')
     return res
 
 
 def parse_ref(tok: Tokenizer) -> AstNode:
     t = tok.pop()
-    res = parse_expression(tok)
+    res = parse_precedence(tok, PREC_ASSIGNMENT)
     tok.expect(']')
     return AstNode('REF', t, res, None)
 
@@ -75,7 +84,8 @@ EXPRESSION_RULES: Dict[str, Tuple[Callable[[Tokenizer], AstNode], Callable[[Toke
     '/': (None, parse_binary, PREC_FACTOR),
     '*': (None, parse_binary, PREC_FACTOR),
     '%': (None, parse_binary, PREC_FACTOR),
-    'SHIFT': (None, parse_binary, PREC_SHIFT),
+    '>>': (None, parse_binary, PREC_SHIFT),
+    '<<': (None, parse_binary, PREC_SHIFT),
     '==': (None, parse_binary, PREC_EQUALITY),
     '!=': (None, parse_binary, PREC_EQUALITY),
     '<': (None, parse_binary, PREC_COMPARISON),
