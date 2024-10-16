@@ -65,7 +65,7 @@ class Assembler:
         self.process_code(open(filename, "rt").read(), filename=filename)
 
     def process_code(self, code, *, filename="[string]"):
-        section = None
+        self.__section_stack = []
         self.__current_scope = None
         tok = Tokenizer()
         tok.add_code(code, filename=filename)
@@ -82,7 +82,7 @@ class Assembler:
                 params = self._fetch_parameters(tok)
                 self.process_file("../FFL3-Disassembly/src/" + params[0][0].value)
             elif start.isA('DIRECTIVE', '#SECTION'):
-                params = self._fetch_parameters(tok)
+                params = self._fetch_parameters(tok, params_end='{')
                 if len(params) < 2:
                     raise AssemblerException(start, "Expected name and type of section")
                 name = self._process_expression(params[0])
@@ -99,7 +99,8 @@ class Assembler:
                     if not address.is_number():
                         raise AssemblerException(name.token, "Address of section type needs to be a number")
                     address = address.token.value
-                section = Section(name.token.value, address)
+                self.__section_stack.append(Section(name.token.value, address))
+                self.__sections.append(self.__section_stack[-1])
             elif start.isA('DIRECTIVE', '#ASSERT'):
                 message = ""
                 conditions = []
@@ -115,7 +116,7 @@ class Assembler:
                         else:
                             conditions.append(condition)
                 for condition in conditions:
-                    section.asserts.append((len(section.data), condition, message))
+                    self.__section_stack[-1].asserts.append((len(self.__section_stack[-1].data), condition, message))
             elif start.isA('ID', 'DS'):
                 for param in self._fetch_parameters(tok):
                     param = self._process_expression(param)
@@ -123,13 +124,13 @@ class Assembler:
                         raise AssemblerException(param.token, "DS needs a constant number")
                     if param.token.kind != 'NUMBER':
                         raise AssemblerException(param.token, "DS needs a constant number")
-                    section.data += bytes(param.token.value)
+                    self.__section_stack[-1].data += bytes(param.token.value)
             elif start.isA('ID', 'DB'):
                 for param in self._fetch_parameters(tok):
-                    section.add8(self._process_expression(param))
+                    self.__section_stack[-1].add8(self._process_expression(param))
             elif start.isA('ID', 'DW'):
                 for param in self._fetch_parameters(tok):
-                    section.add16(self._process_expression(param))
+                    self.__section_stack[-1].add16(self._process_expression(param))
             elif start.isA('ID') and tok.peek().isA('='):
                 tok.pop()
                 params = self._fetch_parameters(tok)
@@ -141,21 +142,23 @@ class Assembler:
                 self.__constants[start.value] = expr.token.value
             elif start.isA('ID') and tok.peek().isA('LABEL'):
                 tok.pop()
-                if start.value in self.__labels:
-                    raise AssemblerException(start, "Duplicate label")
                 label = start.value
                 if start.value.startswith("."):
                     label = f"{self.__current_scope}{label}"
                 else:
                     self.__current_scope = label
-                self.__labels[label] = (section, len(section.data))
+                if label in self.__labels:
+                    raise AssemblerException(start, "Duplicate label")
+                self.__labels[label] = (self.__section_stack[-1], len(self.__section_stack[-1].data))
             elif start.isA('ID'):
                 self._process_statement(start, tok)
+            elif start.isA('}'):
+                self.__section_stack.pop()
             else:
                 raise AssemblerException(start, f"Syntax error")
-        if section is not None and section.data:
-            self.__sections.append(section)
-    
+        if self.__section_stack:
+            raise AssemblerException(tok.pop(), f"EOF reached with section open")
+
     def link(self):
         for section in self.__sections:
             for offset, expr, message in section.asserts:
@@ -198,7 +201,7 @@ class Assembler:
 
     def _add_macro(self, tok: Tokenizer) -> None:
         name = tok.expect('ID')
-        params = self._fetch_parameters(tok)
+        params = self._fetch_parameters(tok, params_end='{')
         content = []
         while token := tok.pop_raw():
             if token.isA('}'):
@@ -212,7 +215,7 @@ class Assembler:
 
     def _add_function(self, tok: Tokenizer) -> None:
         name = tok.expect('ID')
-        params = self._fetch_parameters(tok)
+        params = self._fetch_parameters(tok, params_end='{')
         content = []
         while token := tok.pop_raw():
             if token.isA('}'):
@@ -224,14 +227,18 @@ class Assembler:
             raise AssemblerException(name, "Unterminated function definition")
         self.__func_db.add(name.value.upper(), params, content)
 
-    def _fetch_parameters(self, tok: Tokenizer) -> List[List[Token]]:
+    def _fetch_parameters(self, tok: Tokenizer, *, params_end='NEWLINE') -> List[List[Token]]:
         params = []
-        if tok.match('NEWLINE') or tok.match('{'):
+        if tok.match(params_end):
             return params
         param = []
         params.append(param)
-        while not tok.match('NEWLINE') and not tok.match('{'):
+        while not tok.match(params_end):
             t = tok.pop()
+            if t.kind == 'EOF':
+                if params_end != 'NEWLINE':
+                    raise AssemblerException(t, "Unexpected end of file")
+                break
             if t.isA(','):
                 param = []
                 params.append(param)
@@ -327,19 +334,21 @@ class Assembler:
                 expr.right = None
         return expr
 
-a = Assembler()
-a.process_file("gbz80.instr.asm")
-a.process_file("gbz80.regs.asm")
-# import os
-# for f in sorted(os.listdir("../FFL3-Disassembly/src")):
-#     if f.endswith(".asm"):
-#         a.process_file("../FFL3-Disassembly/src/" + f)
-a.process_code(
-"""
-#SECTION "Name", ROM0[$0000]
-db $12, $34
-""")
 
-rom = bytearray()
-for section in a.link():
-    print(section)
+if __name__ == "__main__":
+    a = Assembler()
+    a.process_file("gbz80.instr.asm")
+    a.process_file("gbz80.regs.asm")
+    # import os
+    # for f in sorted(os.listdir("../FFL3-Disassembly/src")):
+    #     if f.endswith(".asm"):
+    #         a.process_file("../FFL3-Disassembly/src/" + f)
+    a.process_code(
+    """
+    #SECTION "Name", ROM0[$0000]
+    db $12, $34
+    """)
+
+    rom = bytearray()
+    for section in a.link():
+        print(section)

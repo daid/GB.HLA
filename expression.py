@@ -121,4 +121,7 @@ def parse_precedence(tok: Tokenizer, precedence: int) -> AstNode:
 def parse_expression(tokens: List[Token]) -> AstNode:
     tok = Tokenizer()
     tok.prepend(tokens)
-    return parse_precedence(tok, PREC_ASSIGNMENT)
+    result = parse_precedence(tok, PREC_ASSIGNMENT)
+    if not tok.match('EOF'):
+        raise AssemblerException(tok.pop(), "Syntax error")
+    return result
