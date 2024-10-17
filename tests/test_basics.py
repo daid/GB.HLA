@@ -5,7 +5,7 @@ from main import Assembler
 class TestAssemblerBasics(unittest.TestCase):
     def _simple(self, code: str) -> bytes:
         a = Assembler()
-        a.process_code(f'#SECTION "TEST", ROM0[0] {{ {code}\n }}')
+        a.process_code(f'#LAYOUT ROM0[$0000, $4000], AT[0]\n#SECTION "TEST", ROM0[0] {{ {code}\n }}')
         s = a.link()
         self.assertEqual(len(s), 1)
         self.assertEqual(s[0].base_address, 0)

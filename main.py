@@ -1,5 +1,6 @@
 from typing import List, Optional, Dict, Tuple
 import binascii
+import os
 from tokenizer import Token, Tokenizer
 from expression import AstNode, parse_expression
 from exception import AssemblerException
@@ -16,8 +17,17 @@ def params_to_string(params: List[List[Token]]) -> str:
     return ", ".join(tokens_to_string(p) for p in params)
 
 
+class Layout:
+    def __init__(self, name: str, start_addr: int, end_addr: int):
+        self.name = name
+        self.start_addr = start_addr
+        self.end_addr = end_addr
+        self.rom_location = None
+
+
 class Section:
-    def __init__(self, name: str, base_address: Optional[int] = None, bank: Optional[int] = None) -> None:
+    def __init__(self, layout: Layout, name: str, base_address: Optional[int] = None, bank: Optional[int] = None) -> None:
+        self.layout = layout
         self.name = name
         self.base_address = base_address if base_address is not None else -1
         self.bank = bank
@@ -59,10 +69,19 @@ class Assembler:
         self.__labels = {}
         self.__sections = []
         self.__current_scope = None
+        self.__include_paths = [os.path.dirname(__file__)]
+        self.__layouts = {}
     
     def process_file(self, filename):
         print(f"Processing file: {filename}")
         self.process_code(open(filename, "rt").read(), filename=filename)
+
+    def _include_file(self, filename: Token):
+        for path in self.__include_paths:
+            full_path = os.path.join(path, filename.value)
+            if os.path.exists(full_path):
+                return self.process_file(full_path)
+        raise AssemblerException(filename, "Include not found")
 
     def process_code(self, code, *, filename="[string]"):
         self.__section_stack = []
@@ -80,27 +99,13 @@ class Assembler:
                 self._add_function(tok)
             elif start.isA('DIRECTIVE', '#INCLUDE'):
                 params = self._fetch_parameters(tok)
-                self.process_file("../FFL3-Disassembly/src/" + params[0][0].value)
+                if len(params) != 1 or len(params[0]) != 1 or params[0][0].kind != 'STRING':
+                    raise AssemblerException(start, "Syntax error")
+                self._include_file(params[0][0])
+            elif start.isA('DIRECTIVE', '#LAYOUT'):
+                self._define_layout(start, tok)
             elif start.isA('DIRECTIVE', '#SECTION'):
-                params = self._fetch_parameters(tok, params_end='{')
-                if len(params) < 2:
-                    raise AssemblerException(start, "Expected name and type of section")
-                name = self._process_expression(params[0])
-                if name.kind != "value" or name.token.kind != "STRING":
-                    raise AssemblerException(name.token, "Expected name of section")
-                if not params[1][0].isA('ID'):
-                    raise AssemblerException(name.token, "Expected type of section")
-                section_type = params[1][0].value
-                address = -1
-                if len(params[1]) > 1:
-                    if not params[1][1].isA('[') or not params[1][-1].isA(']'):
-                        raise AssemblerException(name.token, "Expected [] after section type")
-                    address = self._process_expression(params[1][2:-1])
-                    if not address.is_number():
-                        raise AssemblerException(name.token, "Address of section type needs to be a number")
-                    address = address.token.value
-                self.__section_stack.append(Section(name.token.value, address))
-                self.__sections.append(self.__section_stack[-1])
+                self._start_section(start, tok)
             elif start.isA('DIRECTIVE', '#ASSERT'):
                 message = ""
                 conditions = []
@@ -185,6 +190,43 @@ class Assembler:
                     section.data[offset+1] = expr.token.value >> 8
         return self.__sections
 
+    def _define_layout(self, start: Token, tok: Tokenizer):
+        params = self._fetch_parameters(tok)
+        if len(params) < 1:
+            raise AssemblerException(start, "Expected name of section layout")
+        name, (start_addr, end_addr) = self._bracket_param(params[0], 2)
+        if name.value in self.__layouts:
+            raise AssemblerException(start, "Duplicate layout name")
+        layout = Layout(name.value, start_addr.token.value, end_addr.token.value)
+        for param in params[1:]:
+            pkey, pvalue = self._bracket_param(param)
+            if pkey.value == 'AT':
+                if len(pvalue) == 0:
+                    raise AssemblerException(pkey, "AT requires an argument")
+                layout.rom_location = pvalue[0].token.value
+        self.__layouts[name.value] = layout
+
+    def _start_section(self, start: Token, tok: Tokenizer):
+        params = self._fetch_parameters(tok, params_end='{')
+        if len(params) < 2:
+            raise AssemblerException(start, "Expected name and type of section")
+        name = self._process_expression(params[0])
+        if name.kind != "value" or name.token.kind != "STRING":
+            raise AssemblerException(name.token, "Expected name of section")
+        if not params[1][0].isA('ID'):
+            raise AssemblerException(name.token, "Expected type of section")
+        section_type, section_type_param = self._bracket_param(params[1])
+        address = -1
+        if section_type_param:
+            address = section_type_param[0].token.value
+        if section_type.value not in self.__layouts:
+            raise AssemblerException(section_type, "Section type not found")
+        layout = self.__layouts[section_type.value]
+        if address > -1 and not (layout.start_addr <= address < layout.end_addr):
+            raise AssemblerException(section_type, "Address out of range for section")
+        self.__section_stack.append(Section(layout, name.token.value, address))
+        self.__sections.append(self.__section_stack[-1])
+
     def _process_statement(self, start: Token, tok: Tokenizer):
         params = self._fetch_parameters(tok)
         macro = self.__macro_db.get(start.value.upper(), params)
@@ -233,13 +275,20 @@ class Assembler:
             return params
         param = []
         params.append(param)
+        brackets = 0
         while not tok.match(params_end):
             t = tok.pop()
             if t.kind == 'EOF':
                 if params_end != 'NEWLINE':
                     raise AssemblerException(t, "Unexpected end of file")
                 break
-            if t.isA(','):
+            if t.kind == '(' or t.kind == '[' or t.kind == '{':
+                brackets += 1
+            elif t.kind == ')' or t.kind == ']' or t.kind == '}':
+                brackets -= 1
+                if brackets < 0:
+                    raise AssemblerException(t, "Syntax error")
+            if t.kind == ',' and brackets == 0:
                 param = []
                 params.append(param)
             else:
@@ -247,6 +296,29 @@ class Assembler:
                     t.value = f"{self.__current_scope}{t.value}"
                 param.append(t)
         return params
+
+    def _bracket_param(self, tokens: List[Token], arg_count: Optional[int] = None):
+        if tokens[0].kind != 'ID':
+            raise AssemblerException(tokens[0], "Syntax error")
+        if len(tokens) < 2:
+            if arg_count is None:
+                return tokens[0], ()
+            raise SyntaxError(tokens[0], "Expected '['")
+        if tokens[1].kind != '[':
+            raise SyntaxError(tokens[1], "Expected '['")
+        if tokens[-1].kind != ']':
+            raise SyntaxError(tokens[-1], "Expected ']'")
+        t = Tokenizer()
+        t.prepend(tokens[2:-1])
+        params = self._fetch_parameters(t)
+        if arg_count is None:
+            if len(params) != 1:
+                raise SyntaxError(tokens[0], "Wrong number of parameters")
+        else:
+            if len(params) != arg_count:
+                raise SyntaxError(tokens[0], "Wrong number of parameters")
+        params = tuple(self._process_expression(param) for param in params)
+        return tokens[0], params
 
     def _process_expression(self, tokens: List[Token]) -> AstNode:
         for start_idx, start in enumerate(tokens):
@@ -337,17 +409,18 @@ class Assembler:
 
 if __name__ == "__main__":
     a = Assembler()
-    a.process_file("gbz80.instr.asm")
-    a.process_file("gbz80.regs.asm")
+    a.process_file("gbz80/layout.asm")
+    a.process_file("gbz80/instr.asm")
+    a.process_file("gbz80/regs.asm")
     # import os
     # for f in sorted(os.listdir("../FFL3-Disassembly/src")):
     #     if f.endswith(".asm"):
     #         a.process_file("../FFL3-Disassembly/src/" + f)
     a.process_code(
     """
-    #SECTION "Name", ROM0[$0000]
+    #SECTION "Name", ROM0[$0000] {
     db $12, $34
-    """)
+    }""")
 
     rom = bytearray()
     for section in a.link():
