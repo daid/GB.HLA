@@ -5,6 +5,8 @@ from tokenizer import Token, Tokenizer
 from expression import AstNode, parse_expression
 from exception import AssemblerException
 from macrodb import MacroDB
+from layout import Layout
+from spaceallocator import SpaceAllocator
 
 
 def tokens_to_string(tokens: List[Token]) -> str:
@@ -15,14 +17,6 @@ def tokens_to_string(tokens: List[Token]) -> str:
 
 def params_to_string(params: List[List[Token]]) -> str:
     return ", ".join(tokens_to_string(p) for p in params)
-
-
-class Layout:
-    def __init__(self, name: str, start_addr: int, end_addr: int):
-        self.name = name
-        self.start_addr = start_addr
-        self.end_addr = end_addr
-        self.rom_location = None
 
 
 class Section:
@@ -70,7 +64,7 @@ class Assembler:
         self.__sections = []
         self.__current_scope = None
         self.__include_paths = [os.path.dirname(__file__)]
-        self.__layouts = {}
+        self.__layouts: Dict[str, Layout] = {}
     
     def process_file(self, filename):
         print(f"Processing file: {filename}")
@@ -165,11 +159,19 @@ class Assembler:
             raise AssemblerException(tok.pop(), f"EOF reached with section open")
 
     def link(self):
+        sa = SpaceAllocator(self.__layouts)
+        for section in self.__sections:
+            if section.base_address > -1:
+                sa.allocate_fixed(section.layout.name, section.base_address, len(section.data))
+        for section in self.__sections:
+            if section.base_address < 0:
+                bank, addr = sa.allocate(section.layout.name, len(section.data), bank=section.bank)
+                section.bank = bank
+                section.base_address = addr
         for section in self.__sections:
             for offset, expr, message in section.asserts:
                 expr = self._resolve_expr(section.base_address + offset, expr)
                 if expr.kind != 'value' or expr.token.kind != 'NUMBER':
-                    print(expr)
                     raise AssemblerException(expr.token, f"Assertion failure (symbol not found?)")
                 if expr.token.value == 0:
                     raise AssemblerException(expr.token, f"Assertion failure: {message}")
@@ -188,6 +190,8 @@ class Assembler:
                         raise AssemblerException(expr.token, f"Value out of range")
                     section.data[offset] = expr.token.value & 0xFF
                     section.data[offset+1] = expr.token.value >> 8
+                else:
+                    raise NotImplementedError()
         return self.__sections
 
     def _define_layout(self, start: Token, tok: Tokenizer):
@@ -204,6 +208,12 @@ class Assembler:
                 if len(pvalue) == 0:
                     raise AssemblerException(pkey, "AT requires an argument")
                 layout.rom_location = pvalue[0].token.value
+            elif pkey.value == 'BANKED':
+                if len(pvalue) != 0:
+                    raise AssemblerException(pkey, "BANKED requires no argument")
+                layout.banked = True
+            else:
+                raise AssemblerException(pkey, "Unknown parameter to #LAYOUT")
         self.__layouts[name.value] = layout
 
     def _start_section(self, start: Token, tok: Tokenizer):
@@ -224,8 +234,17 @@ class Assembler:
         layout = self.__layouts[section_type.value]
         if address > -1 and not (layout.start_addr <= address < layout.end_addr):
             raise AssemblerException(section_type, "Address out of range for section")
-        self.__section_stack.append(Section(layout, name.token.value, address))
-        self.__sections.append(self.__section_stack[-1])
+        section = Section(layout, name.token.value, address)
+        for param in params[2:]:
+            pkey, pvalue = self._bracket_param(param)
+            if pkey.value == 'BANK':
+                if len(pvalue) != 1:
+                    raise AssemblerException(pkey, "BANK requires an argument")
+                section.bank = pvalue[0].token.value
+            else:
+                raise AssemblerException(pkey, "Unknown parameter to #SECTION")
+        self.__section_stack.append(section)
+        self.__sections.append(section)
 
     def _process_statement(self, start: Token, tok: Tokenizer):
         params = self._fetch_parameters(tok)
@@ -418,9 +437,13 @@ if __name__ == "__main__":
     #         a.process_file("../FFL3-Disassembly/src/" + f)
     a.process_code(
     """
-    #SECTION "Name", ROM0[$0000] {
+    #SECTION "Name", ROM0 {
     db $12, $34
-    }""")
+    }
+    #SECTION "Name", ROMX, BANK[1] {
+    db $12, $34
+    }
+    """)
 
     rom = bytearray()
     for section in a.link():
