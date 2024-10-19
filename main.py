@@ -108,14 +108,13 @@ class Assembler:
                     if condition.kind == 'value' and condition.token.kind == 'STRING':
                         message = condition.token.value
                     else:
-                        condition = self._resolve_expr(None, condition)
-                        if condition.kind == 'value' and condition.token.kind == 'NUMBER':
-                            if condition.token.value == 0:
-                                raise AssemblerException(condition.token, "Assertion failure")
-                        else:
-                            conditions.append(condition)
+                        conditions.append(self._resolve_expr(None, condition))
                 for condition in conditions:
-                    self.__section_stack[-1].asserts.append((len(self.__section_stack[-1].data), condition, message))
+                    if condition.kind == 'value' and condition.token.kind == 'NUMBER':
+                        if condition.token.value == 0:
+                            raise AssemblerException(condition.token, f"Assertion failure: {message}")
+                    else:
+                        self.__section_stack[-1].asserts.append((len(self.__section_stack[-1].data), condition, message))
             elif start.isA('ID', 'DS'):
                 for param in self._fetch_parameters(tok):
                     param = self._process_expression(param)
@@ -194,6 +193,31 @@ class Assembler:
                     raise NotImplementedError()
         return self.__sections
 
+    def build_rom(self):
+        max_bank = {}
+        for section in self.__sections:
+            if section.bank is None:
+                continue
+            max_bank[section.layout.name] = max(section.bank, max_bank.get(section.layout.name, 0))
+        rom_size = 0
+        for section in self.__sections:
+            if section.layout.rom_location is None:
+                continue
+            layout_size = section.layout.end_addr - section.layout.start_addr
+            if section.layout.banked:
+                bank_count = (1 << max_bank[section.layout.name].bit_length()) - section.layout.bank_min
+                layout_size *= bank_count
+            rom_size = max(section.layout.rom_location + layout_size, rom_size)
+        rom = bytearray(rom_size)
+        for section in self.__sections:
+            if section.layout.rom_location is None:
+                continue
+            offset = section.layout.rom_location + section.base_address - section.layout.start_addr
+            if section.layout.banked:
+                offset += (section.layout.end_addr - section.layout.start_addr) * (section.bank - section.layout.bank_min)
+            rom[offset:offset+len(section.data)] = section.data
+        return rom
+
     def _define_layout(self, start: Token, tok: Tokenizer):
         params = self._fetch_parameters(tok)
         if len(params) < 1:
@@ -209,8 +233,12 @@ class Assembler:
                     raise AssemblerException(pkey, "AT requires an argument")
                 layout.rom_location = pvalue[0].token.value
             elif pkey.value == 'BANKED':
-                if len(pvalue) != 0:
-                    raise AssemblerException(pkey, "BANKED requires no argument")
+                if len(pvalue) > 2:
+                    raise AssemblerException(pkey, "BANKED expects at most 2 arguments")
+                if len(pvalue) > 1:
+                    layout.bank_max = pvalue[1].token.value
+                if len(pvalue) > 0:
+                    layout.bank_min = pvalue[0].token.value
                 layout.banked = True
             else:
                 raise AssemblerException(pkey, "Unknown parameter to #LAYOUT")
@@ -240,7 +268,13 @@ class Assembler:
             if pkey.value == 'BANK':
                 if len(pvalue) != 1:
                     raise AssemblerException(pkey, "BANK requires an argument")
+                if not layout.banked:
+                    raise AssemblerException(pkey, "Cannot assign a bank to an unbanked section")
                 section.bank = pvalue[0].token.value
+                if section.bank < layout.bank_min:
+                    raise AssemblerException(pkey, "Bank number need to be at least {layout.bank_min}")
+                if layout.bank_max is not None and section.bank >= layout.bank_max:
+                    raise AssemblerException(pkey, "Bank number needs to be lower then {layout.bank_max}")
             else:
                 raise AssemblerException(pkey, "Unknown parameter to #SECTION")
         self.__section_stack.append(section)
@@ -322,20 +356,17 @@ class Assembler:
         if len(tokens) < 2:
             if arg_count is None:
                 return tokens[0], ()
-            raise SyntaxError(tokens[0], "Expected '['")
+            raise AssemblerException(tokens[0], "Expected '['")
         if tokens[1].kind != '[':
-            raise SyntaxError(tokens[1], "Expected '['")
+            raise AssemblerException(tokens[1], "Expected '['")
         if tokens[-1].kind != ']':
-            raise SyntaxError(tokens[-1], "Expected ']'")
+            raise AssemblerException(tokens[-1], "Expected ']'")
         t = Tokenizer()
         t.prepend(tokens[2:-1])
         params = self._fetch_parameters(t)
-        if arg_count is None:
-            if len(params) != 1:
-                raise SyntaxError(tokens[0], "Wrong number of parameters")
-        else:
+        if arg_count is not None:
             if len(params) != arg_count:
-                raise SyntaxError(tokens[0], "Wrong number of parameters")
+                raise AssemblerException(tokens[0], "Wrong number of parameters")
         params = tuple(self._process_expression(param) for param in params)
         return tokens[0], params
 
@@ -398,6 +429,10 @@ class Assembler:
                         expr.token = Token('NUMBER', expr.left.token.value - expr.right.token.value, expr.left.token.line_nr, expr.left.token.filename)
                     else:
                         expr.token = Token('NUMBER', -expr.left.token.value, expr.left.token.line_nr, expr.left.token.filename)
+                elif expr.kind == '*':
+                    expr.token = Token('NUMBER', expr.left.token.value * expr.right.token.value, expr.left.token.line_nr, expr.left.token.filename)
+                elif expr.kind == '/':
+                    expr.token = Token('NUMBER', expr.left.token.value // expr.right.token.value, expr.left.token.line_nr, expr.left.token.filename)
                 elif expr.kind == '&':
                     expr.token = Token('NUMBER', expr.left.token.value & expr.right.token.value, expr.left.token.line_nr, expr.left.token.filename)
                 elif expr.kind == '|':
@@ -440,7 +475,7 @@ if __name__ == "__main__":
     #SECTION "Name", ROM0 {
     db $12, $34
     }
-    #SECTION "Name", ROMX, BANK[1] {
+    #SECTION "Name", ROMX, BANK[$199] {
     db $12, $34
     }
     """)
@@ -448,3 +483,4 @@ if __name__ == "__main__":
     rom = bytearray()
     for section in a.link():
         print(section)
+    

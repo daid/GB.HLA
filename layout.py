@@ -7,3 +7,5 @@ class Layout:
         self.end_addr = end_addr
         self.rom_location = None
         self.banked = False
+        self.bank_min = 0
+        self.bank_max = None

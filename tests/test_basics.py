@@ -1,5 +1,5 @@
 import unittest
-from main import Assembler
+from main import Assembler, AssemblerException
 
 
 class TestAssemblerBasics(unittest.TestCase):
@@ -11,11 +11,27 @@ class TestAssemblerBasics(unittest.TestCase):
         self.assertEqual(s[0].base_address, 0)
         return s[0].data
 
-    def test_basic(self):
+    def test_db(self):
         self.assertEqual(self._simple("db $12, $34"), b'\x12\x34')
+    def test_dw(self):
         self.assertEqual(self._simple("dw $1234"), b'\x34\x12')
+    def test_label(self):
         self.assertEqual(self._simple("dw label\nlabel:"), b'\x02\x00')
-
-
-if __name__ == '__main__':
-    unittest.main()
+    def test_ds(self):
+        self.assertEqual(self._simple("ds 2"), b'\x00\x00')
+    def test_var(self):
+        self.assertEqual(self._simple("VALUE = $1 + 3\ndb VALUE"), b'\x04')
+    def test_var2(self):
+        self.assertEqual(self._simple("VALUE = $1 + 3\ndb VALUE\nVALUE = 3 * 3\ndb VALUE"), b'\x04\x09')
+    def test_assert(self):
+        with self.assertRaises(AssemblerException) as context:
+            self._simple('#ASSERT 0')
+        self.assertIn("Assertion failure", context.exception.message)
+    def test_assert_msg(self):
+        with self.assertRaises(AssemblerException) as context:
+            self._simple('#ASSERT 0, "FAIL"')
+        self.assertIn("FAIL", context.exception.message)
+    def test_assert_label(self):
+        with self.assertRaises(AssemblerException) as context:
+            self._simple('#ASSERT label != 0, "FAIL"\nlabel:')
+        self.assertIn("FAIL", context.exception.message)

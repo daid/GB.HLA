@@ -8,8 +8,8 @@ class SpaceAllocationInfo:
         self.__layout = layout
         self.__available = []
         if layout.banked:
-            self.__available.append((0, layout.start_addr, layout.end_addr))
-            self.__next_free_bank = 1
+            self.__available.append((layout.bank_min, layout.start_addr, layout.end_addr))
+            self.__next_free_bank = layout.bank_min + 1
         else:
             self.__available.append((None, layout.start_addr, layout.end_addr))
             self.__next_free_bank = None
@@ -47,9 +47,11 @@ class SpaceAllocationInfo:
         if bank is not None or not self.__layout.banked:
             raise AssemblerException(None, f"Failed to allocate region: {length:04x}")
         self.__new_bank()
-        return self.allocate(length, bank, allow_new_bank=False)
+        return self.allocate(length, bank)
 
     def __new_bank(self):
+        if self.__layout.bank_max is not None and self.__next_free_bank == self.__layout.bank_max:
+            raise AssemblerException(None, f"Ran out of available banks for {self.__layout.name}")
         self.__available.append((self.__next_free_bank, self.__layout.start_addr, self.__layout.end_addr))
         self.__next_free_bank += 1
 
