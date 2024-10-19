@@ -1,5 +1,5 @@
-#FUNC HIGH _value { ((_value >> 8) & $FF) }
-#FUNC LOW _value { ((_value >> 8) & $FF) }
+#FUNC HIGH _value { (((_value) >> 8) & $FF) }
+#FUNC LOW _value { ((_value) & $FF) }
 #FUNC JR_OFFSET _target { _target - @ }
 #MACRO adc a, [hl] { db $8e }
 #MACRO adc a, _value { db $ce, _value }

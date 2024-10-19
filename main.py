@@ -42,7 +42,7 @@ class Section:
         if node.kind == 'value' and node.token.kind == 'NUMBER':
             self.data.append(node.token.value)
         elif node.kind == 'value' and node.token.kind == 'STRING':
-            self.data += node.token.value[1:-1].encode("ASCII")
+            self.data += node.token.value.encode("ASCII")
         else:
             self.link[len(self.data)] = (1, node)
             self.data.append(0)
@@ -335,7 +335,7 @@ class Assembler:
                 if params_end != 'NEWLINE':
                     raise AssemblerException(t, "Unexpected end of file")
                 break
-            if t.kind == '(' or t.kind == '[' or t.kind == '{':
+            if t.kind == '(' or t.kind == '[' or t.kind == '{' or t.kind == 'FUNC':
                 brackets += 1
             elif t.kind == ')' or t.kind == ']' or t.kind == '}':
                 brackets -= 1
@@ -375,9 +375,10 @@ class Assembler:
             if start.kind == 'FUNC':
                 args = []
                 arg = []
+                brackets = 0
                 for end_idx in range(start_idx + 1, len(tokens)):
                     t = tokens[end_idx]
-                    if t.isA(')'):
+                    if t.isA(')') and brackets == 0:
                         if arg:
                             args.append(arg)
                         func = self.__func_db.get(start.value.upper(), args)
@@ -392,10 +393,14 @@ class Assembler:
                                 contents.append(token)
                         tokens = tokens[:start_idx] + contents + tokens[end_idx+1:]
                         return self._process_expression(tokens)
-                    elif t.isA(','):
+                    elif t.isA(',') and brackets == 0:
                         args.append(arg)
                         arg = []
                     else:
+                        if t.kind == 'FUNC':
+                            brackets += 1
+                        elif t.kind == ')':
+                            brackets -= 1
                         arg.append(tokens[end_idx])
                 raise AssemblerException(start, f"Function not closed: {start.value}")
             if start.kind == 'ID' and start.value in self.__constants:
@@ -472,11 +477,24 @@ if __name__ == "__main__":
     #         a.process_file("../FFL3-Disassembly/src/" + f)
     a.process_code(
     """
-    #SECTION "Name", ROM0 {
-    db $12, $34
-    }
-    #SECTION "Name", ROMX, BANK[$199] {
-    db $12, $34
+    #SECTION "Header", ROM0[$100] {
+    nop
+    jp entry
+    db $CE, $ED, $66, $66, $CC, $0D, $00, $0B, $03, $73, $00, $83, $00, $0C, $00, $0D
+    db $00, $08, $11, $1F, $88, $89, $00, $0E, $DC, $CC, $6E, $E6, $DD, $DD, $D9, $99
+    db $BB, $BB, $67, $63, $6E, $0E, $EC, $CC, $DD, $DC, $99, $9F, $BB, $B9, $33, $3E
+    db "TITLE           "
+    db $00, $00
+    db $00 ; sgb
+    db $00 ; cart type
+    db $00 ; ROM size
+    db $00 ; RAM size
+    db $01 ; JP only or worldwide
+    db $00 ; Licensee
+    db $00 ; Version
+    db $00 ; Header Checksum
+    dw 0 ; ROM checksum
+entry:
     }
     """)
 
