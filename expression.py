@@ -37,7 +37,9 @@ class AstNode:
     def __repr__(self):
         if self.kind == 'value':
             return f"{self.token.value}"
-        return f"({self.left} {self.kind} {self.right})"
+        if self.right:
+            return f"({self.left} {self.kind} {self.right})"
+        return f"({self.kind} {self.left})"
 
 
 def parse_value(tok: Tokenizer) -> AstNode:
@@ -75,6 +77,7 @@ EXPRESSION_RULES: Dict[str, Tuple[Callable[[Tokenizer], AstNode], Callable[[Toke
     'ID': (parse_value, None, PREC_NONE),
     'STRING': (parse_value, None, PREC_NONE),
     'CURADDR': (parse_value, None, PREC_NONE),
+    '#': (parse_unary, None, PREC_NONE),
     '&': (None, parse_binary, PREC_BITWISE_AND),
     '^': (None, parse_binary, PREC_BITWISE_XOR),
     '|': (None, parse_binary, PREC_BITWISE_OR),

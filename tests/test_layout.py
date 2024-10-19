@@ -46,13 +46,13 @@ class TestAssemblerLayout(unittest.TestCase):
     #SECTION "TEST", ROM {
         db 1, 2
     }
-    #SECTION "TEST", ROM, BANK[1] {
+    #SECTION "TEST1", ROM, BANK[1] {
         db 3, 4
     }
-    #SECTION "TEST", ROM {
+    #SECTION "TEST2", ROM {
         db 4, 5
     }
-    #SECTION "TEST", ROM {
+    #SECTION "TEST3", ROM {
         db 6, 7
     }
 """), b'\x01\x02\x04\x05\x03\x04\x06\x07')

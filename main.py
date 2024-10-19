@@ -7,6 +7,7 @@ from exception import AssemblerException
 from macrodb import MacroDB
 from layout import Layout
 from spaceallocator import SpaceAllocator
+import builtin
 
 
 def tokens_to_string(tokens: List[Token]) -> str:
@@ -89,7 +90,7 @@ class Assembler:
                 break
             if start.isA('DIRECTIVE', '#MACRO'):
                 self._add_macro(tok)
-            elif start.isA('DIRECTIVE', '#FUNC'):
+            elif start.isA('DIRECTIVE', '#FMACRO'):
                 self._add_function(tok)
             elif start.isA('DIRECTIVE', '#INCLUDE'):
                 params = self._fetch_parameters(tok)
@@ -253,6 +254,9 @@ class Assembler:
             raise AssemblerException(name.token, "Expected name of section")
         if not params[1][0].isA('ID'):
             raise AssemblerException(name.token, "Expected type of section")
+        for section in self.__sections:
+            if section.name == name.token.value:
+                raise AssemblerException(name.token, "Duplicate section name")
         section_type, section_type_param = self._bracket_param(params[1])
         address = -1
         if section_type_param:
@@ -381,6 +385,11 @@ class Assembler:
                     if t.isA(')') and brackets == 0:
                         if arg:
                             args.append(arg)
+                        func = builtin.get(start.value.upper())
+                        if func is not None:
+                            contents = func(self, args)
+                            tokens = tokens[:start_idx] + contents + tokens[end_idx + 1:]
+                            return self._process_expression(tokens)
                         func = self.__func_db.get(start.value.upper(), args)
                         if func is None:
                             raise AssemblerException(start, f"Function not found: {start.value}")
@@ -408,18 +417,30 @@ class Assembler:
                 start.value = self.__constants[start.value]
         return parse_expression(tokens)
 
-    def _resolve_expr(self, offset: Optional[int], expr: AstNode) -> AstNode:
+    def _resolve_expr(self, offset: Optional[int], expr: AstNode) -> Optional[AstNode]:
         if expr is None:
             return None
         if expr.kind == 'value' and expr.token.isA('ID'):
             if expr.token.value not in self.__labels:
                 return expr
             section, section_offset = self.__labels[expr.token.value]
+            if section.base_address < 0:
+                return expr
             expr.token = Token('NUMBER', section.base_address + section_offset, expr.token.line_nr, expr.token.filename)
         elif expr.kind == 'value' and expr.token.isA('CURADDR'):
             if offset is None:
                 return expr
             expr.token = Token('NUMBER', offset, expr.token.line_nr, expr.token.filename)
+        elif expr.kind == '#':
+            if expr.left.token.value not in self.__labels:
+                return expr
+            section, section_offset = self.__labels[expr.left.token.value]
+            if section.base_address < 0:
+                return expr
+            bank = section.bank if section.bank is not None else 0
+            expr.kind = 'value'
+            expr.token = Token('NUMBER', bank, expr.token.line_nr, expr.token.filename)
+            expr.left = None
         else:
             expr.left = self._resolve_expr(offset, expr.left)
             expr.right = self._resolve_expr(offset, expr.right)
@@ -466,7 +487,7 @@ class Assembler:
         return expr
 
 
-if __name__ == "__main__":
+def main():
     a = Assembler()
     a.process_file("gbz80/layout.asm")
     a.process_file("gbz80/instr.asm")
@@ -477,7 +498,7 @@ if __name__ == "__main__":
     #         a.process_file("../FFL3-Disassembly/src/" + f)
     a.process_code(
     """
-    #SECTION "Header", ROM0[$100] {
+#SECTION "Header", ROM0[$100] {
     nop
     jp entry
     db $CE, $ED, $66, $66, $CC, $0D, $00, $0B, $03, $73, $00, $83, $00, $0C, $00, $0D
@@ -492,13 +513,21 @@ if __name__ == "__main__":
     db $01 ; JP only or worldwide
     db $00 ; Licensee
     db $00 ; Version
-    db $00 ; Header Checksum
+    db $04 ; Header Checksum
     dw 0 ; ROM checksum
 entry:
-    }
+    jr entry
+}
+
+#SECTION "Test", ROMX, BANK[1] {
+    nop
+}
     """)
 
-    rom = bytearray()
     for section in a.link():
         print(section)
-    
+    open("rom.gb", "wb").write(a.build_rom())
+
+
+if __name__ == "__main__":
+    main()
