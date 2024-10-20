@@ -66,6 +66,7 @@ class Assembler:
         self.__current_scope = None
         self.__include_paths = [os.path.dirname(__file__)]
         self.__layouts: Dict[str, Layout] = {}
+        self.__checksums: List[Tuple[Section, int, int, Optional[int], Optional[int]]] = []
     
     def process_file(self, filename):
         print(f"Processing file: {filename}")
@@ -101,6 +102,19 @@ class Assembler:
                 self._define_layout(start, tok)
             elif start.isA('DIRECTIVE', '#SECTION'):
                 self._start_section(start, tok)
+            elif start.isA('DIRECTIVE', '#CHECKSUM'):
+                params = [self._resolve_expr(None, self._process_expression(param)) for param in self._fetch_parameters(tok)]
+                for param in params:
+                    if not param.is_number():
+                        raise AssemblerException("#CHECKSUM requires number parameters")
+                if len(params) == 1:
+                    self.__checksums.append((self.__section_stack[-1], len(self.__section_stack[-1].data), params[0].token.value, None, None))
+                elif len(params) == 3:
+                    self.__checksums.append((self.__section_stack[-1], len(self.__section_stack[-1].data), params[0].token.value, params[1].token.value, params[2].token.value))
+                else:
+                    raise AssemblerException("#CHECKSUM requires one or three parameters")
+                for n in range(abs(params[0].token.value)):
+                    self.__section_stack[-1].data.append(0)
             elif start.isA('DIRECTIVE', '#ASSERT'):
                 message = ""
                 conditions = []
@@ -217,7 +231,28 @@ class Assembler:
             if section.layout.banked:
                 offset += (section.layout.end_addr - section.layout.start_addr) * (section.bank - section.layout.bank_min)
             rom[offset:offset+len(section.data)] = section.data
+
+        for section, offset, size, start, end in self.__checksums:
+            start = start or 0
+            end = end or rom_size
+            checksum = 0
+            if size < 0:
+                for n in range(start, end):
+                    checksum -= rom[n] + 1
+            else:
+                for n in range(start, end):
+                    checksum += rom[n]
+            offset = section.layout.rom_location + section.base_address - section.layout.start_addr + offset
+            for n in range(abs(size)):
+                rom[offset + n] = (checksum >> ((abs(size) - 1 - n) * 8)) & 0xFF
         return rom
+
+    def save_symbols(self, filename: str) -> None:
+        with open(filename, "wt") as f:
+            for label, (section, offset) in self.__labels.items():
+                address = section.base_address + offset
+                bank = section.bank if section.bank is not None else 0
+                f.write(f"{bank:02x}:{address:04x} {label}\n")
 
     def _define_layout(self, start: Token, tok: Tokenizer):
         params = self._fetch_parameters(tok)
@@ -513,8 +548,8 @@ def main():
     db $01 ; JP only or worldwide
     db $00 ; Licensee
     db $00 ; Version
-    db $04 ; Header Checksum
-    dw 0 ; ROM checksum
+    #CHECKSUM -1, $134, $14D ; Header Checksum
+    #CHECKSUM 2 ; ROM checksum
 entry:
     jr entry
 }
@@ -527,6 +562,7 @@ entry:
     for section in a.link():
         print(section)
     open("rom.gb", "wb").write(a.build_rom())
+    a.save_symbols("rom.sym")
 
 
 if __name__ == "__main__":
