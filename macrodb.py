@@ -10,6 +10,20 @@ class Macro:
         self.params = params
         self.contents = contents
 
+        sort_key = []
+        for param_idx, param in enumerate(params):
+            for t_idx, t in enumerate(param):
+                if t.isA('ID') and t.value.startswith('_'):
+                    sort_key.append(-param_idx * 100 - t_idx)
+        self.__sort_key = tuple(sort_key)
+
+    def is_constant_params(self):
+        for param in self.params:
+            for t in param:
+                if t.isA('ID') and t.value.startswith('_'):
+                    return False
+        return True
+
     def match_params(self, params: List[List[Token]]) -> Optional[Dict[str, List[Token]]]:
         if len(params) != len(self.params):
             return None
@@ -41,16 +55,22 @@ class Macro:
     def __repr__(self):
         return f"<Macro:{self.name}:{self.params}>"
 
+    @staticmethod
+    def sort_key(self):
+        return self.__sort_key
+
 
 class MacroDB:
     def __init__(self):
         self.__macros: Dict[str, Tuple[List[Macro], List[Macro]]] = defaultdict(lambda: ([], []))
 
     def add(self, name: str, params: List[List[Token]], contents: List[Token]):
-        if MacroDB.is_constant_params(params):
-            self.__macros[name][0].append(Macro(name, params, contents))
+        macro = Macro(name, params, contents)
+        if macro.is_constant_params():
+            self.__macros[name][0].append(macro)
         else:
-            self.__macros[name][1].append(Macro(name, params, contents))
+            self.__macros[name][1].append(macro)
+            self.__macros[name][1].sort(key=Macro.sort_key)
 
     def get(self, name: str, params: List[List[Token]]) -> Optional[Tuple[Macro, Dict[str, List[Token]]]]:
         for macro in self.__macros[name][0]:
@@ -64,11 +84,3 @@ class MacroDB:
             if res is not None:
                 return macro, res
         return None
-
-    @staticmethod
-    def is_constant_params(params: List[List[Token]]):
-        for param in params:
-            for t in param:
-                if t.isA('ID') and t.value.startswith('_'):
-                    return False
-        return True

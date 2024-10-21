@@ -115,7 +115,11 @@ class Assembler:
                     if condition.kind == 'value' and condition.token.kind == 'STRING':
                         message = condition.token.value
                     else:
-                        conditions.append(self._resolve_expr(None, condition))
+                        try:
+                            condition = self._resolve_expr(None, condition)
+                        except PostRomBuild:
+                            pass
+                        conditions.append(condition)
                 for condition in conditions:
                     if condition.kind == 'value' and condition.token.kind == 'NUMBER':
                         if condition.token.value == 0:
@@ -141,7 +145,11 @@ class Assembler:
                 params = self._fetch_parameters(tok)
                 if len(params) != 1:
                     raise AssemblerException(start, "Syntax error")
-                expr = self._resolve_expr(None, self._process_expression(params[0]))
+                expr = self._process_expression(params[0])
+                try:
+                    expr = self._resolve_expr(None, expr)
+                except PostRomBuild:
+                    pass
                 if not expr.is_number():
                     raise AssemblerException(expr.token, "Assignment requires constant expression")
                 self.__constants[start.value] = expr.token.value
@@ -176,9 +184,12 @@ class Assembler:
                 section.base_address = addr
         for section in self.__sections:
             for offset, expr, message in section.asserts:
-                expr = self._resolve_expr(section.base_address + offset, expr)
+                try:
+                    expr = self._resolve_expr(section.base_address + offset, expr)
+                except PostRomBuild:
+                    pass
                 if expr.kind != 'value' or expr.token.kind != 'NUMBER':
-                    raise AssemblerException(expr.token, f"Assertion failure (symbol not found?)")
+                    raise AssemblerException(expr.token, f"Assertion failure (symbol not found?) {expr}")
                 if expr.token.value == 0:
                     raise AssemblerException(expr.token, f"Assertion failure: {message}")
             for offset, (link_size, expr) in section.link.items():
@@ -480,9 +491,15 @@ class Assembler:
                 if section.base_address < 0:
                     return expr
                 bank = section.bank if section.bank is not None else 0
-                expr.kind = 'value'
-                expr.token = Token('NUMBER', bank, expr.token.line_nr, expr.token.filename)
-                expr.right = None
+                return AstNode('value', Token('NUMBER', bank, expr.token.line_nr, expr.token.filename), None, None)
+            elif expr.token.value == 'BANK_MAX':
+                if self.__rom is None:
+                    raise PostRomBuild()
+                count = 0
+                for section in self.__sections:
+                    if section.layout.name == expr.right.left.token.value:
+                        count = max(count, section.bank if section.bank is not None else 0)
+                return AstNode('value', Token('NUMBER', count, expr.token.line_nr, expr.token.filename), None, None)
             elif expr.token.value == 'CHECKSUM':
                 if self.__rom is None:
                     raise PostRomBuild()
@@ -493,10 +510,12 @@ class Assembler:
                     if not expr.right.right.left.is_number():
                         return expr
                     start, end = expr.right.left.token.value, expr.right.right.left.token.value
-                expr.kind = 'value'
-                expr.token = Token('NUMBER', sum(self.__rom[start:end]), expr.token.line_nr, expr.token.filename)
-                expr.right = None
-                return expr
+                return AstNode('value', Token('NUMBER', sum(self.__rom[start:end]), expr.token.line_nr, expr.token.filename), None, None)
+            elif expr.token.value == 'BIT_LENGTH':
+                expr = self._resolve_expr(offset, expr.right.left)
+                if not expr.is_number():
+                    raise AssemblerException(expr.token, "BIT_LENGTH parameter is not a number")
+                return AstNode('value', Token('NUMBER', expr.token.value.bit_length(), expr.token.line_nr, expr.token.filename), None, None)
             else:
                 raise NotImplementedError(str(expr))
         else:
@@ -566,7 +585,7 @@ def main():
     db $00, $00
     db $00 ; sgb
     db $00 ; cart type
-    db $00 ; ROM size
+    db BIT_LENGTH(BANK_MAX(ROMX)) - 1 ; ROM size
     db $00 ; RAM size
     db $01 ; JP only or worldwide
     db $00 ; Licensee
@@ -575,10 +594,6 @@ def main():
     dw ((CHECKSUM() & $FF00) >> 8) | ((CHECKSUM() & $00FF) << 8)
 entry:
     jr entry
-}
-
-#SECTION "Test", ROMX, BANK[1] {
-    nop
 }
     """)
 

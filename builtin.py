@@ -22,6 +22,11 @@ def strlen(assembler, args: List[List[Token]]) -> List[Token]:
 
 
 @builtin
+def bit_length(assembler, args: List[List[Token]]) -> List[Token]:
+    return None
+
+
+@builtin
 def bank(assembler, args: List[List[Token]]) -> Optional[List[Token]]:
     if len(args) != 1:
         raise AssemblerException(args[0][0], "bank requires 1 argument")
@@ -32,6 +37,11 @@ def bank(assembler, args: List[List[Token]]) -> Optional[List[Token]]:
 
 @builtin
 def checksum(assembler, args: List[List[Token]]) -> Optional[List[Token]]:
+    return None
+
+
+@builtin
+def bank_max(assembler, args: List[List[Token]]) -> Optional[List[Token]]:
     return None
 
 
