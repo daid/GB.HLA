@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from tokenizer import Token
 from exception import AssemblerException
 
@@ -22,13 +22,17 @@ def strlen(assembler, args: List[List[Token]]) -> List[Token]:
 
 
 @builtin
-def bank(assembler, args: List[List[Token]]) -> List[Token]:
+def bank(assembler, args: List[List[Token]]) -> Optional[List[Token]]:
     if len(args) != 1:
         raise AssemblerException(args[0][0], "bank requires 1 argument")
     if len(args[0]) != 1 or args[0][0].kind != "ID":
         raise AssemblerException(args[0][0], "Expected a label")
-    label = args[0][0]
-    return [Token("#", "#", label.line_nr, label.filename), label]
+    return None
+
+
+@builtin
+def checksum(assembler, args: List[List[Token]]) -> Optional[List[Token]]:
+    return None
 
 
 def get(fname: str):

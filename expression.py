@@ -35,6 +35,14 @@ class AstNode:
         return True
 
     def __repr__(self):
+        if self.kind == 'call':
+            if self.right:
+                return f"{self.token.value}({self.right})"
+            return f"{self.token.value}()"
+        if self.kind == 'param':
+            if self.right:
+                return f"{self.left}, {self.right}"
+            return f"{self.left}"
         if self.kind == 'value':
             return f"{self.token.value}"
         if self.right:
@@ -52,6 +60,21 @@ def parse_grouping(tok: Tokenizer) -> AstNode:
     res = parse_precedence(tok, PREC_ASSIGNMENT)
     tok.expect(')')
     return res
+
+
+def parse_call(tok: Tokenizer) -> AstNode:
+    func = AstNode('call', tok.pop(), None, None)
+    if tok.match(')'):
+        return func
+    args = [parse_precedence(tok, PREC_ASSIGNMENT)]
+    while tok.match(','):
+        args.append(parse_precedence(tok, PREC_ASSIGNMENT))
+    tok.expect(')')
+    node = func
+    for arg in args:
+        node.right = AstNode('param', arg.token, arg, None)
+        node = node.right
+    return func
 
 
 def parse_ref(tok: Tokenizer) -> AstNode:
@@ -98,6 +121,7 @@ EXPRESSION_RULES: Dict[str, Tuple[Callable[[Tokenizer], AstNode], Callable[[Toke
     '&&': (None, parse_binary, PREC_LOGIC_AND),
     '||': (None, parse_binary, PREC_LOGIC_OR),
     'NUMBER': (parse_value, None, PREC_NONE),
+    'FUNC': (parse_call, None, PREC_CALL),
     '(': (parse_grouping, None, PREC_CALL),
     '[': (parse_ref, None, PREC_CALL),
 }

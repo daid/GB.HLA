@@ -20,6 +20,10 @@ def params_to_string(params: List[List[Token]]) -> str:
     return ", ".join(tokens_to_string(p) for p in params)
 
 
+class PostRomBuild(Exception):
+    pass
+
+
 class Section:
     def __init__(self, layout: Layout, name: str, base_address: Optional[int] = None, bank: Optional[int] = None) -> None:
         self.layout = layout
@@ -66,7 +70,8 @@ class Assembler:
         self.__current_scope = None
         self.__include_paths = [os.path.dirname(__file__)]
         self.__layouts: Dict[str, Layout] = {}
-        self.__checksums: List[Tuple[Section, int, int, Optional[int], Optional[int]]] = []
+        self.__rom = None
+        self.__post_build_link = []
     
     def process_file(self, filename):
         print(f"Processing file: {filename}")
@@ -102,19 +107,6 @@ class Assembler:
                 self._define_layout(start, tok)
             elif start.isA('DIRECTIVE', '#SECTION'):
                 self._start_section(start, tok)
-            elif start.isA('DIRECTIVE', '#CHECKSUM'):
-                params = [self._resolve_expr(None, self._process_expression(param)) for param in self._fetch_parameters(tok)]
-                for param in params:
-                    if not param.is_number():
-                        raise AssemblerException("#CHECKSUM requires number parameters")
-                if len(params) == 1:
-                    self.__checksums.append((self.__section_stack[-1], len(self.__section_stack[-1].data), params[0].token.value, None, None))
-                elif len(params) == 3:
-                    self.__checksums.append((self.__section_stack[-1], len(self.__section_stack[-1].data), params[0].token.value, params[1].token.value, params[2].token.value))
-                else:
-                    raise AssemblerException("#CHECKSUM requires one or three parameters")
-                for n in range(abs(params[0].token.value)):
-                    self.__section_stack[-1].data.append(0)
             elif start.isA('DIRECTIVE', '#ASSERT'):
                 message = ""
                 conditions = []
@@ -190,22 +182,26 @@ class Assembler:
                 if expr.token.value == 0:
                     raise AssemblerException(expr.token, f"Assertion failure: {message}")
             for offset, (link_size, expr) in section.link.items():
-                expr = self._resolve_expr(section.base_address + offset, expr)
-                if expr.kind != 'value':
-                    raise AssemblerException(expr.token, f"Failed to parse linking {expr}, symbol not found?")
-                if not expr.token.isA('NUMBER'):
-                    raise AssemblerException(expr.token, f"Expected a number.")
-                if link_size == 1:
-                    if expr.token.value < -128 or expr.token.value > 255:
-                        raise AssemblerException(expr.token, f"Value out of range")
-                    section.data[offset] = expr.token.value & 0xFF
-                elif link_size == 2:
-                    if expr.token.value < 0 or expr.token.value > 0xFFFF:
-                        raise AssemblerException(expr.token, f"Value out of range")
-                    section.data[offset] = expr.token.value & 0xFF
-                    section.data[offset+1] = expr.token.value >> 8
+                try:
+                    expr = self._resolve_expr(section.base_address + offset, expr)
+                except PostRomBuild:
+                    self.__post_build_link.append((section, offset, link_size, expr))
                 else:
-                    raise NotImplementedError()
+                    if expr.kind != 'value':
+                        raise AssemblerException(expr.token, f"Failed to parse linking {expr}, symbol not found?")
+                    if not expr.token.isA('NUMBER'):
+                        raise AssemblerException(expr.token, f"Expected a number.")
+                    if link_size == 1:
+                        if expr.token.value < -128 or expr.token.value > 255:
+                            raise AssemblerException(expr.token, f"Value out of range")
+                        section.data[offset] = expr.token.value & 0xFF
+                    elif link_size == 2:
+                        if expr.token.value < 0 or expr.token.value > 0xFFFF:
+                            raise AssemblerException(expr.token, f"Value out of range")
+                        section.data[offset] = expr.token.value & 0xFF
+                        section.data[offset+1] = expr.token.value >> 8
+                    else:
+                        raise NotImplementedError()
         return self.__sections
 
     def build_rom(self):
@@ -223,29 +219,35 @@ class Assembler:
                 bank_count = (1 << max_bank[section.layout.name].bit_length()) - section.layout.bank_min
                 layout_size *= bank_count
             rom_size = max(section.layout.rom_location + layout_size, rom_size)
-        rom = bytearray(rom_size)
+        self.__rom = bytearray(rom_size)
         for section in self.__sections:
             if section.layout.rom_location is None:
                 continue
             offset = section.layout.rom_location + section.base_address - section.layout.start_addr
             if section.layout.banked:
                 offset += (section.layout.end_addr - section.layout.start_addr) * (section.bank - section.layout.bank_min)
-            rom[offset:offset+len(section.data)] = section.data
-
-        for section, offset, size, start, end in self.__checksums:
-            start = start or 0
-            end = end or rom_size
-            checksum = 0
-            if size < 0:
-                for n in range(start, end):
-                    checksum -= rom[n] + 1
-            else:
-                for n in range(start, end):
-                    checksum += rom[n]
+            self.__rom[offset:offset+len(section.data)] = section.data
+        for section, offset, link_size, expr in self.__post_build_link:
+            if section.layout.rom_location is None:
+                continue
             offset = section.layout.rom_location + section.base_address - section.layout.start_addr + offset
-            for n in range(abs(size)):
-                rom[offset + n] = (checksum >> ((abs(size) - 1 - n) * 8)) & 0xFF
-        return rom
+            if section.layout.banked:
+                offset += (section.layout.end_addr - section.layout.start_addr) * (section.bank - section.layout.bank_min)
+            expr = self._resolve_expr(section.base_address + offset, expr)
+            if expr.kind != 'value':
+                raise AssemblerException(expr.token, f"Failed to parse linking {expr}, symbol not found?")
+            if link_size == 1:
+                if expr.token.value < -128 or expr.token.value > 255:
+                    raise AssemblerException(expr.token, f"Value out of range")
+                self.__rom[offset] = expr.token.value & 0xFF
+            elif link_size == 2:
+                if expr.token.value < 0 or expr.token.value > 0xFFFF:
+                    raise AssemblerException(expr.token, f"Value out of range")
+                self.__rom[offset] = expr.token.value & 0xFF
+                self.__rom[offset+1] = expr.token.value >> 8
+            else:
+                raise NotImplementedError()
+        return self.__rom
 
     def save_symbols(self, filename: str) -> None:
         with open(filename, "wt") as f:
@@ -423,7 +425,10 @@ class Assembler:
                         func = builtin.get(start.value.upper())
                         if func is not None:
                             contents = func(self, args)
-                            tokens = tokens[:start_idx] + contents + tokens[end_idx + 1:]
+                            if contents is None:
+                                return parse_expression(tokens)
+                            else:
+                                tokens = tokens[:start_idx] + contents + tokens[end_idx + 1:]
                             return self._process_expression(tokens)
                         func = self.__func_db.get(start.value.upper(), args)
                         if func is None:
@@ -466,16 +471,34 @@ class Assembler:
             if offset is None:
                 return expr
             expr.token = Token('NUMBER', offset, expr.token.line_nr, expr.token.filename)
-        elif expr.kind == '#':
-            if expr.left.token.value not in self.__labels:
+        elif expr.kind == 'call':
+            if expr.token.value == 'BANK':
+                label_token = expr.right.left.token
+                if label_token.value not in self.__labels:
+                    return expr
+                section, section_offset = self.__labels[label_token.value]
+                if section.base_address < 0:
+                    return expr
+                bank = section.bank if section.bank is not None else 0
+                expr.kind = 'value'
+                expr.token = Token('NUMBER', bank, expr.token.line_nr, expr.token.filename)
+                expr.right = None
+            elif expr.token.value == 'CHECKSUM':
+                if self.__rom is None:
+                    raise PostRomBuild()
+                start, end = 0, len(self.__rom)
+                if expr.right:
+                    if not expr.right.left.is_number():
+                        return expr
+                    if not expr.right.right.left.is_number():
+                        return expr
+                    start, end = expr.right.left.token.value, expr.right.right.left.token.value
+                expr.kind = 'value'
+                expr.token = Token('NUMBER', sum(self.__rom[start:end]), expr.token.line_nr, expr.token.filename)
+                expr.right = None
                 return expr
-            section, section_offset = self.__labels[expr.left.token.value]
-            if section.base_address < 0:
-                return expr
-            bank = section.bank if section.bank is not None else 0
-            expr.kind = 'value'
-            expr.token = Token('NUMBER', bank, expr.token.line_nr, expr.token.filename)
-            expr.left = None
+            else:
+                raise NotImplementedError(str(expr))
         else:
             expr.left = self._resolve_expr(offset, expr.left)
             expr.right = self._resolve_expr(offset, expr.right)
@@ -548,8 +571,8 @@ def main():
     db $01 ; JP only or worldwide
     db $00 ; Licensee
     db $00 ; Version
-    #CHECKSUM -1, $134, $14D ; Header Checksum
-    #CHECKSUM 2 ; ROM checksum
+    db LOW(-CHECKSUM($134, $14D)-($14D - $134))
+    dw ((CHECKSUM() & $FF00) >> 8) | ((CHECKSUM() & $00FF) << 8)
 entry:
     jr entry
 }
