@@ -25,3 +25,9 @@ class TestAssemblerFMacro(unittest.TestCase):
 
     def test_overload(self):
         self.assertEqual(self._simple("#FMACRO FUNC _a { _a + 1 }\n#FMACRO FUNC 1 { 0 }", "db FUNC(1), FUNC(2)"), b'\x00\x03')
+
+    def test_overload_with_macro(self):
+        self.assertEqual(self._simple("#FMACRO FUNC _a { _a + 1 }\n#FMACRO FUNC 1 { 0 }\n#MACRO M _a { db 1 }\n#MACRO M 0 { db 2 }", "M FUNC(1)\nM FUNC(2)"), b'\x02\x01')
+
+    def test_nest_builtin(self):
+        self.assertEqual(self._simple("#FMACRO FUNC _a { _a + 1 }", 'db FUNC(STRLEN("123"))'), b'\x04')

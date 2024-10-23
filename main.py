@@ -13,7 +13,12 @@ import builtin
 def tokens_to_string(tokens: List[Token]) -> str:
     result = ""
     for t in tokens:
-        result += str(t.value)
+        if t.kind == 'FUNC':
+            result += f"{t.value}("
+        elif t.kind == 'STRING':
+            result += f'"{t.value}"'
+        else:
+            result += str(t.value)
     return result
 
 def params_to_string(params: List[List[Token]]) -> str:
@@ -389,13 +394,28 @@ class Assembler:
         param = []
         params.append(param)
         brackets = 0
-        while not tok.match(params_end):
+        while brackets != 0 or not tok.match(params_end):
             t = tok.pop()
             if t.kind == 'EOF':
                 if params_end != 'NEWLINE':
                     raise AssemblerException(t, "Unexpected end of file")
                 break
-            if t.kind == '(' or t.kind == '[' or t.kind == '{' or t.kind == 'FUNC':
+            if t.kind == 'FUNC':
+                func = builtin.get(t.value.upper())
+                if not func:
+                    fparams = self._fetch_parameters(tok, params_end=')')
+                    func = self.__func_db.get(t.value.upper(), fparams)
+                    if func is None:
+                        raise AssemblerException(t, f"Function not found: {t.value}")
+                    func, func_args = func
+                    for token in func.contents:
+                        if token.kind == 'ID' and token.value in func_args:
+                            param += func_args[token.value]
+                        else:
+                            param.append(token)
+                    continue
+                brackets += 1
+            elif t.kind == '(' or t.kind == '[' or t.kind == '{':
                 brackets += 1
             elif t.kind == ')' or t.kind == ']' or t.kind == '}':
                 brackets -= 1
@@ -442,24 +462,13 @@ class Assembler:
                         if arg:
                             args.append(arg)
                         func = builtin.get(start.value.upper())
-                        if func is not None:
-                            contents = func(self, args)
-                            if contents is None:
-                                return parse_expression(tokens)
-                            else:
-                                tokens = tokens[:start_idx] + contents + tokens[end_idx + 1:]
-                            return self._process_expression(tokens)
-                        func = self.__func_db.get(start.value.upper(), args)
                         if func is None:
-                            raise AssemblerException(start, f"Function not found: {start.value}")
-                        func, func_args = func
-                        contents = []
-                        for token in func.contents:
-                            if token.kind == 'ID' and token.value in func_args:
-                                contents += func_args[token.value]
-                            else:
-                                contents.append(token)
-                        tokens = tokens[:start_idx] + contents + tokens[end_idx+1:]
+                            raise RuntimeError("_fetch_parameters allowed a non-builting through?")
+                        contents = func(self, args)
+                        if contents is None:
+                            return parse_expression(tokens)
+                        else:
+                            tokens = tokens[:start_idx] + contents + tokens[end_idx + 1:]
                         return self._process_expression(tokens)
                     elif t.isA(',') and brackets == 0:
                         args.append(arg)
