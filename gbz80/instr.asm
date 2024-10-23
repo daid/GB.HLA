@@ -115,6 +115,7 @@
     dw _target }
 #MACRO ccf { db $3f }
 #MACRO cp a, [hl] { db $be }
+#MACRO cp _value { cp a, _value }
 #MACRO cp a, _value { db $fe, _value }
 #MACRO cp a, a { db $bf }
 #MACRO cp a, b { db $b8 }
@@ -524,6 +525,7 @@
 #MACRO swap h { db $cb, $34 }
 #MACRO swap l { db $cb, $35 }
 #MACRO xor a, [hl] { db $ae }
+#MACRO xor _value { xor a, _value }
 #MACRO xor a, _value { db $ee, _value }
 #MACRO xor a, a { db $af }
 #MACRO xor a, b { db $a8 }

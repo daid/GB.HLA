@@ -132,6 +132,8 @@ class Assembler:
                     else:
                         self.__section_stack[-1].asserts.append((len(self.__section_stack[-1].data), condition, message))
             elif start.isA('ID', 'DS'):
+                if not self.__section_stack:
+                    raise AssemblerException(start, "Expression outside of section")
                 for param in self._fetch_parameters(tok):
                     param = self._resolve_expr(None, self._process_expression(param))
                     if param.kind != 'value':
@@ -142,9 +144,13 @@ class Assembler:
                         raise AssemblerException(param.token, "DS needs a positive number")
                     self.__section_stack[-1].data += bytes(param.token.value)
             elif start.isA('ID', 'DB'):
+                if not self.__section_stack:
+                    raise AssemblerException(start, "Expression outside of section")
                 for param in self._fetch_parameters(tok):
                     self.__section_stack[-1].add8(self._process_expression(param))
             elif start.isA('ID', 'DW'):
+                if not self.__section_stack:
+                    raise AssemblerException(start, "Expression outside of section")
                 for param in self._fetch_parameters(tok):
                     self.__section_stack[-1].add16(self._process_expression(param))
             elif start.isA('ID') and tok.peek().isA('='):
@@ -206,9 +212,9 @@ class Assembler:
                     self.__post_build_link.append((section, offset, link_size, expr))
                 else:
                     if expr.kind != 'value':
-                        raise AssemblerException(expr.token, f"Failed to parse linking {expr}, symbol not found?")
+                        raise AssemblerException(expr.token, f"Failed to parse linking '{expr}', symbol not found?")
                     if not expr.token.isA('NUMBER'):
-                        raise AssemblerException(expr.token, f"Expected a number.")
+                        raise AssemblerException(expr.token, f"Failed to link '{expr}', not a number (symbol not found?)")
                     if link_size == 1:
                         if expr.token.value < -128 or expr.token.value > 255:
                             raise AssemblerException(expr.token, f"Value out of range")
@@ -331,9 +337,9 @@ class Assembler:
                     raise AssemblerException(pkey, "Cannot assign a bank to an unbanked section")
                 section.bank = pvalue[0].token.value
                 if section.bank < layout.bank_min:
-                    raise AssemblerException(pkey, "Bank number need to be at least {layout.bank_min}")
+                    raise AssemblerException(pkey, f"Bank number need to be at least {layout.bank_min}")
                 if layout.bank_max is not None and section.bank >= layout.bank_max:
-                    raise AssemblerException(pkey, "Bank number needs to be lower then {layout.bank_max}")
+                    raise AssemblerException(pkey, f"Bank number needs to be lower then {layout.bank_max}")
             else:
                 raise AssemblerException(pkey, "Unknown parameter to #SECTION")
         self.__section_stack.append(section)
@@ -582,25 +588,19 @@ class Assembler:
 
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("filename")
+
+    args = parser.parse_args()
+    print(args)
+
     a = Assembler()
-    a.process_file("gbz80/layout.asm")
-    a.process_file("gbz80/instr.asm")
-    a.process_file("gbz80/regs.asm")
-    a.process_file("gbz80/header.asm")
     # import os
     # for f in sorted(os.listdir("../FFL3-Disassembly/src")):
     #     if f.endswith(".asm"):
     #         a.process_file("../FFL3-Disassembly/src/" + f)
-    a.process_code(
-    """
-    GB_HEADER "Title", 0, entry
-
-#SECTION "Entry", ROM0 {
-entry:
-    jr entry
-}
-    """)
-
+    a.process_file(args.filename)
     for section in a.link():
         print(section)
     open("rom.gb", "wb").write(a.build_rom())
