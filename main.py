@@ -128,11 +128,13 @@ class Assembler:
                         self.__section_stack[-1].asserts.append((len(self.__section_stack[-1].data), condition, message))
             elif start.isA('ID', 'DS'):
                 for param in self._fetch_parameters(tok):
-                    param = self._process_expression(param)
+                    param = self._resolve_expr(None, self._process_expression(param))
                     if param.kind != 'value':
                         raise AssemblerException(param.token, "DS needs a constant number")
                     if param.token.kind != 'NUMBER':
                         raise AssemblerException(param.token, "DS needs a constant number")
+                    if param.token.value < 0:
+                        raise AssemblerException(param.token, "DS needs a positive number")
                     self.__section_stack[-1].data += bytes(param.token.value)
             elif start.isA('ID', 'DB'):
                 for param in self._fetch_parameters(tok):
@@ -350,9 +352,15 @@ class Assembler:
         name = tok.expect('ID')
         params = self._fetch_parameters(tok, params_end='{')
         content = []
+        bracket = 0
         while token := tok.pop_raw():
-            if token.isA('}'):
-                break
+            if token.kind == '{':
+                bracket += 1
+            if token.kind == '}':
+                if bracket == 0:
+                    break
+                else:
+                    bracket -= 1
             content.append(token)
         if token is None:
             raise AssemblerException(name, "Unterminated macro definition")
@@ -569,29 +577,16 @@ def main():
     a.process_file("gbz80/layout.asm")
     a.process_file("gbz80/instr.asm")
     a.process_file("gbz80/regs.asm")
+    a.process_file("gbz80/header.asm")
     # import os
     # for f in sorted(os.listdir("../FFL3-Disassembly/src")):
     #     if f.endswith(".asm"):
     #         a.process_file("../FFL3-Disassembly/src/" + f)
     a.process_code(
     """
-#SECTION "Header", ROM0[$100] {
-    nop
-    jp entry
-    db $CE, $ED, $66, $66, $CC, $0D, $00, $0B, $03, $73, $00, $83, $00, $0C, $00, $0D
-    db $00, $08, $11, $1F, $88, $89, $00, $0E, $DC, $CC, $6E, $E6, $DD, $DD, $D9, $99
-    db $BB, $BB, $67, $63, $6E, $0E, $EC, $CC, $DD, $DC, $99, $9F, $BB, $B9, $33, $3E
-    db "TITLE           "
-    db $00, $00
-    db $00 ; sgb
-    db $00 ; cart type
-    db BIT_LENGTH(BANK_MAX(ROMX)) - 1 ; ROM size
-    db $00 ; RAM size
-    db $01 ; JP only or worldwide
-    db $00 ; Licensee
-    db $00 ; Version
-    db LOW(-CHECKSUM($134, $14D)-($14D - $134))
-    dw ((CHECKSUM() & $FF00) >> 8) | ((CHECKSUM() & $00FF) << 8)
+    GB_HEADER "Title", 0, entry
+
+#SECTION "Entry", ROM0 {
 entry:
     jr entry
 }

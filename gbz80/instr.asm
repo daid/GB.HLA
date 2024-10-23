@@ -1,4 +1,10 @@
+#FMACRO HIGH bc { b }
+#FMACRO HIGH de { d }
+#FMACRO HIGH hl { h }
 #FMACRO HIGH _value { (((_value) >> 8) & $FF) }
+#FMACRO LOW bc { c }
+#FMACRO LOW de { e }
+#FMACRO LOW hl { l }
 #FMACRO LOW _value { ((_value) & $FF) }
 #FMACRO JR_OFFSET _target { _target - @ }
 #MACRO adc a, [hl] { db $8e }
@@ -158,8 +164,8 @@
 #MACRO jp z, _target { db $ca
     dw _target }
 #MACRO _jr_offset_byte _target {
-    #ASSERT (_target - @ - 1) < 128, (_target - @ - 1) >= -128, "JR offset out of range"
-    db _target - @ - 1 }
+    #ASSERT ((_target) - @ - 1) < 128, ((_target) - @ - 1) >= -128, "JR offset out of range"
+    db (_target) - @ - 1 }
 #MACRO jr _target { db $18
     _jr_offset_byte _target }
 #MACRO jr c, _target { db $38

@@ -81,3 +81,17 @@ class TestAssemblerLayout(unittest.TestCase):
         ds 2
     }
 """), b'\x01\x02\x03\x04')
+
+    def test_nesting(self):
+        self.assertEqual(self._build(
+"""
+    #LAYOUT ROM[0,3], AT[0]
+    #SECTION "A", ROM {
+        db 1
+        #SECTION "B", ROM {
+            db 2
+        }
+        db 3
+    }
+"""), b'\x01\x03\x02')
+
