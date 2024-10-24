@@ -77,8 +77,13 @@ class Assembler:
         self.__layouts: Dict[str, Layout] = {}
         self.__rom = None
         self.__post_build_link = []
-    
+
     def process_file(self, filename):
+        self.__include_paths.append(os.path.dirname(filename))
+        self._process_file(filename)
+        self.__include_paths.pop()
+
+    def _process_file(self, filename):
         print(f"Processing file: {filename}")
         self.process_code(open(filename, "rt").read(), filename=filename)
 
@@ -86,7 +91,7 @@ class Assembler:
         for path in self.__include_paths:
             full_path = os.path.join(path, filename.value)
             if os.path.exists(full_path):
-                return self.process_file(full_path)
+                return self._process_file(full_path)
         raise AssemblerException(filename, "Include not found")
 
     def process_code(self, code, *, filename="[string]"):
