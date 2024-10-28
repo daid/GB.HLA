@@ -14,6 +14,15 @@ class SpaceAllocationInfo:
             self.__available.append((None, layout.start_addr, layout.end_addr))
             self.__next_free_bank = None
     
+    def free_space(self):
+        per_bank = {}
+        for bank, start, end in self.__available:
+            per_bank[bank] = per_bank.get(bank, 0) + (end - start)
+        return per_bank
+    
+    def total_space(self):
+        return self.__layout.end_addr - self.__layout.start_addr
+
     def allocate_fixed(self, start: int, length: int, *, bank: Optional[int]) -> Optional[int]:
         if bank is not None:
             while bank >= self.__next_free_bank:
@@ -59,6 +68,15 @@ class SpaceAllocationInfo:
 class SpaceAllocator:
     def __init__(self, layouts: Dict[str, Layout]):
         self.__data = {name: SpaceAllocationInfo(layout) for name, layout in layouts.items()}
+
+    def dump_free_space(self) -> None:
+        print("Free space:")
+        for name, sai in self.__data.items():
+            spaces = sai.free_space()
+            for bank, free in sorted(spaces.items()):
+                bank = f" {bank:02x}" if bank is not None else ""
+                if free < sai.total_space():
+                    print(f"  {name:5}{bank:5} {free:5}/{sai.total_space():<5} ({free/sai.total_space()*100}%)")
 
     def allocate_fixed(self, section_type: str, start: int, length: int, *, bank: Optional[int]=None) -> int:
         return self.__data[section_type].allocate_fixed(start, length, bank=bank)

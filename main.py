@@ -231,6 +231,7 @@ class Assembler:
                         section.data[offset+1] = expr.token.value >> 8
                     else:
                         raise NotImplementedError()
+        sa.dump_free_space()
         return self.__sections
 
     def build_rom(self):
@@ -606,8 +607,9 @@ def main():
     #     if f.endswith(".asm"):
     #         a.process_file("../FFL3-Disassembly/src/" + f)
     a.process_file(args.filename)
-    for section in a.link():
-        print(section)
+    a.link()
+    # for section in a.link():
+    #     print(section)
     open("rom.gb", "wb").write(a.build_rom())
     a.save_symbols("rom.sym")
 
