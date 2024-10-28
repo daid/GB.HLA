@@ -7,6 +7,7 @@
 #FMACRO LOW hl { l }
 #FMACRO LOW _value { ((_value) & $FF) }
 #FMACRO JR_OFFSET _target { _target - @ }
+#MACRO adc _value { adc a, _value }
 #MACRO adc a, [hl] { db $8e }
 #MACRO adc a, _value { db $ce, _value }
 #MACRO adc a, a { db $8f }
@@ -16,6 +17,7 @@
 #MACRO adc a, e { db $8b }
 #MACRO adc a, h { db $8c }
 #MACRO adc a, l { db $8d }
+#MACRO add _value { add a, _value }
 #MACRO add a, [hl] { db $86 }
 #MACRO add a, _value { db $c6, _value }
 #MACRO add a, a { db $87 }
@@ -30,6 +32,7 @@
 #MACRO add hl, hl { db $29 }
 #MACRO add hl, sp { db $39 }
 #MACRO add sp, _offset { db $e8, _offset }
+#MACRO and _value { and a, _value }
 #MACRO and a, [hl] { db $a6 }
 #MACRO and a, _value { db $e6, _value }
 #MACRO and a, a { db $a7 }
@@ -39,70 +42,14 @@
 #MACRO and a, e { db $a3 }
 #MACRO and a, h { db $a4 }
 #MACRO and a, l { db $a5 }
-#MACRO bit 0, [hl] { db $cb, $46 }
-#MACRO bit 0, a { db $cb, $47 }
-#MACRO bit 0, b { db $cb, $40 }
-#MACRO bit 0, c { db $cb, $41 }
-#MACRO bit 0, d { db $cb, $42 }
-#MACRO bit 0, e { db $cb, $43 }
-#MACRO bit 0, h { db $cb, $44 }
-#MACRO bit 0, l { db $cb, $45 }
-#MACRO bit 1, [hl] { db $cb, $4e }
-#MACRO bit 1, a { db $cb, $4f }
-#MACRO bit 1, b { db $cb, $48 }
-#MACRO bit 1, c { db $cb, $49 }
-#MACRO bit 1, d { db $cb, $4a }
-#MACRO bit 1, e { db $cb, $4b }
-#MACRO bit 1, h { db $cb, $4c }
-#MACRO bit 1, l { db $cb, $4d }
-#MACRO bit 2, [hl] { db $cb, $56 }
-#MACRO bit 2, a { db $cb, $57 }
-#MACRO bit 2, b { db $cb, $50 }
-#MACRO bit 2, c { db $cb, $51 }
-#MACRO bit 2, d { db $cb, $52 }
-#MACRO bit 2, e { db $cb, $53 }
-#MACRO bit 2, h { db $cb, $54 }
-#MACRO bit 2, l { db $cb, $55 }
-#MACRO bit 3, [hl] { db $cb, $5e }
-#MACRO bit 3, a { db $cb, $5f }
-#MACRO bit 3, b { db $cb, $58 }
-#MACRO bit 3, c { db $cb, $59 }
-#MACRO bit 3, d { db $cb, $5a }
-#MACRO bit 3, e { db $cb, $5b }
-#MACRO bit 3, h { db $cb, $5c }
-#MACRO bit 3, l { db $cb, $5d }
-#MACRO bit 4, [hl] { db $cb, $66 }
-#MACRO bit 4, a { db $cb, $67 }
-#MACRO bit 4, b { db $cb, $60 }
-#MACRO bit 4, c { db $cb, $61 }
-#MACRO bit 4, d { db $cb, $62 }
-#MACRO bit 4, e { db $cb, $63 }
-#MACRO bit 4, h { db $cb, $64 }
-#MACRO bit 4, l { db $cb, $65 }
-#MACRO bit 5, [hl] { db $cb, $6e }
-#MACRO bit 5, a { db $cb, $6f }
-#MACRO bit 5, b { db $cb, $68 }
-#MACRO bit 5, c { db $cb, $69 }
-#MACRO bit 5, d { db $cb, $6a }
-#MACRO bit 5, e { db $cb, $6b }
-#MACRO bit 5, h { db $cb, $6c }
-#MACRO bit 5, l { db $cb, $6d }
-#MACRO bit 6, [hl] { db $cb, $76 }
-#MACRO bit 6, a { db $cb, $77 }
-#MACRO bit 6, b { db $cb, $70 }
-#MACRO bit 6, c { db $cb, $71 }
-#MACRO bit 6, d { db $cb, $72 }
-#MACRO bit 6, e { db $cb, $73 }
-#MACRO bit 6, h { db $cb, $74 }
-#MACRO bit 6, l { db $cb, $75 }
-#MACRO bit 7, [hl] { db $cb, $7e }
-#MACRO bit 7, a { db $cb, $7f }
-#MACRO bit 7, b { db $cb, $78 }
-#MACRO bit 7, c { db $cb, $79 }
-#MACRO bit 7, d { db $cb, $7a }
-#MACRO bit 7, e { db $cb, $7b }
-#MACRO bit 7, h { db $cb, $7c }
-#MACRO bit 7, l { db $cb, $7d }
+#MACRO bit _id, [hl] { db $cb, $46 | ((_idx) << 3) }
+#MACRO bit _idx, a { db $cb, $47 | ((_idx) << 3) }
+#MACRO bit _idx, b { db $cb, $40 | ((_idx) << 3) }
+#MACRO bit _idx, c { db $cb, $41 | ((_idx) << 3) }
+#MACRO bit _idx, d { db $cb, $42 | ((_idx) << 3) }
+#MACRO bit _idx, e { db $cb, $43 | ((_idx) << 3) }
+#MACRO bit _idx, h { db $cb, $44 | ((_idx) << 3) }
+#MACRO bit _idx, l { db $cb, $45 | ((_idx) << 3) }
 #MACRO call _target { db $cd
     dw _target }
 #MACRO call c, _target { db $dc
@@ -281,6 +228,7 @@
     #ASSERT HIGH(_target) == $ff
     db LOW(_target) }
 #MACRO nop { db $00 }
+#MACRO or _value { or a, _value }
 #MACRO or a, [hl] { db $b6 }
 #MACRO or a, _value { db $f6, _value }
 #MACRO or a, a { db $b7 }
@@ -298,70 +246,14 @@
 #MACRO push bc { db $c5 }
 #MACRO push de { db $d5 }
 #MACRO push hl { db $e5 }
-#MACRO res 0, [hl] { db $cb, $86 }
-#MACRO res 0, a { db $cb, $87 }
-#MACRO res 0, b { db $cb, $80 }
-#MACRO res 0, c { db $cb, $81 }
-#MACRO res 0, d { db $cb, $82 }
-#MACRO res 0, e { db $cb, $83 }
-#MACRO res 0, h { db $cb, $84 }
-#MACRO res 0, l { db $cb, $85 }
-#MACRO res 1, [hl] { db $cb, $8e }
-#MACRO res 1, a { db $cb, $8f }
-#MACRO res 1, b { db $cb, $88 }
-#MACRO res 1, c { db $cb, $89 }
-#MACRO res 1, d { db $cb, $8a }
-#MACRO res 1, e { db $cb, $8b }
-#MACRO res 1, h { db $cb, $8c }
-#MACRO res 1, l { db $cb, $8d }
-#MACRO res 2, [hl] { db $cb, $96 }
-#MACRO res 2, a { db $cb, $97 }
-#MACRO res 2, b { db $cb, $90 }
-#MACRO res 2, c { db $cb, $91 }
-#MACRO res 2, d { db $cb, $92 }
-#MACRO res 2, e { db $cb, $93 }
-#MACRO res 2, h { db $cb, $94 }
-#MACRO res 2, l { db $cb, $95 }
-#MACRO res 3, [hl] { db $cb, $9e }
-#MACRO res 3, a { db $cb, $9f }
-#MACRO res 3, b { db $cb, $98 }
-#MACRO res 3, c { db $cb, $99 }
-#MACRO res 3, d { db $cb, $9a }
-#MACRO res 3, e { db $cb, $9b }
-#MACRO res 3, h { db $cb, $9c }
-#MACRO res 3, l { db $cb, $9d }
-#MACRO res 4, [hl] { db $cb, $a6 }
-#MACRO res 4, a { db $cb, $a7 }
-#MACRO res 4, b { db $cb, $a0 }
-#MACRO res 4, c { db $cb, $a1 }
-#MACRO res 4, d { db $cb, $a2 }
-#MACRO res 4, e { db $cb, $a3 }
-#MACRO res 4, h { db $cb, $a4 }
-#MACRO res 4, l { db $cb, $a5 }
-#MACRO res 5, [hl] { db $cb, $ae }
-#MACRO res 5, a { db $cb, $af }
-#MACRO res 5, b { db $cb, $a8 }
-#MACRO res 5, c { db $cb, $a9 }
-#MACRO res 5, d { db $cb, $aa }
-#MACRO res 5, e { db $cb, $ab }
-#MACRO res 5, h { db $cb, $ac }
-#MACRO res 5, l { db $cb, $ad }
-#MACRO res 6, [hl] { db $cb, $b6 }
-#MACRO res 6, a { db $cb, $b7 }
-#MACRO res 6, b { db $cb, $b0 }
-#MACRO res 6, c { db $cb, $b1 }
-#MACRO res 6, d { db $cb, $b2 }
-#MACRO res 6, e { db $cb, $b3 }
-#MACRO res 6, h { db $cb, $b4 }
-#MACRO res 6, l { db $cb, $b5 }
-#MACRO res 7, [hl] { db $cb, $be }
-#MACRO res 7, a { db $cb, $bf }
-#MACRO res 7, b { db $cb, $b8 }
-#MACRO res 7, c { db $cb, $b9 }
-#MACRO res 7, d { db $cb, $ba }
-#MACRO res 7, e { db $cb, $bb }
-#MACRO res 7, h { db $cb, $bc }
-#MACRO res 7, l { db $cb, $bd }
+#MACRO res _idx, [hl] { db $cb, $86 | ((_idx) << 3) }
+#MACRO res _idx, a { db $cb, $87 | ((_idx) << 3) }
+#MACRO res _idx, b { db $cb, $80 | ((_idx) << 3) }
+#MACRO res _idx, c { db $cb, $81 | ((_idx) << 3) }
+#MACRO res _idx, d { db $cb, $82 | ((_idx) << 3) }
+#MACRO res _idx, e { db $cb, $83 | ((_idx) << 3) }
+#MACRO res _idx, h { db $cb, $84 | ((_idx) << 3) }
+#MACRO res _idx, l { db $cb, $85 | ((_idx) << 3) }
 #MACRO ret { db $c9 }
 #MACRO ret c { db $d8 }
 #MACRO ret nc { db $d0 }
@@ -407,6 +299,7 @@
 #MACRO rst _value {
     #ASSERT (_value & $07) == 0, _value < $40, "RST target invalid"
     db $c7 + _value }
+#MACRO sbc _value { sbc a, _value }
 #MACRO sbc a, [hl] { db $9e }
 #MACRO sbc a, _value { db $de, _value }
 #MACRO sbc a, a { db $9f }
@@ -417,70 +310,14 @@
 #MACRO sbc a, h { db $9c }
 #MACRO sbc a, l { db $9d }
 #MACRO scf { db $37 }
-#MACRO set 0, [hl] { db $cb, $c6 }
-#MACRO set 0, a { db $cb, $c7 }
-#MACRO set 0, b { db $cb, $c0 }
-#MACRO set 0, c { db $cb, $c1 }
-#MACRO set 0, d { db $cb, $c2 }
-#MACRO set 0, e { db $cb, $c3 }
-#MACRO set 0, h { db $cb, $c4 }
-#MACRO set 0, l { db $cb, $c5 }
-#MACRO set 1, [hl] { db $cb, $ce }
-#MACRO set 1, a { db $cb, $cf }
-#MACRO set 1, b { db $cb, $c8 }
-#MACRO set 1, c { db $cb, $c9 }
-#MACRO set 1, d { db $cb, $ca }
-#MACRO set 1, e { db $cb, $cb }
-#MACRO set 1, h { db $cb, $cc }
-#MACRO set 1, l { db $cb, $cd }
-#MACRO set 2, [hl] { db $cb, $d6 }
-#MACRO set 2, a { db $cb, $d7 }
-#MACRO set 2, b { db $cb, $d0 }
-#MACRO set 2, c { db $cb, $d1 }
-#MACRO set 2, d { db $cb, $d2 }
-#MACRO set 2, e { db $cb, $d3 }
-#MACRO set 2, h { db $cb, $d4 }
-#MACRO set 2, l { db $cb, $d5 }
-#MACRO set 3, [hl] { db $cb, $de }
-#MACRO set 3, a { db $cb, $df }
-#MACRO set 3, b { db $cb, $d8 }
-#MACRO set 3, c { db $cb, $d9 }
-#MACRO set 3, d { db $cb, $da }
-#MACRO set 3, e { db $cb, $db }
-#MACRO set 3, h { db $cb, $dc }
-#MACRO set 3, l { db $cb, $dd }
-#MACRO set 4, [hl] { db $cb, $e6 }
-#MACRO set 4, a { db $cb, $e7 }
-#MACRO set 4, b { db $cb, $e0 }
-#MACRO set 4, c { db $cb, $e1 }
-#MACRO set 4, d { db $cb, $e2 }
-#MACRO set 4, e { db $cb, $e3 }
-#MACRO set 4, h { db $cb, $e4 }
-#MACRO set 4, l { db $cb, $e5 }
-#MACRO set 5, [hl] { db $cb, $ee }
-#MACRO set 5, a { db $cb, $ef }
-#MACRO set 5, b { db $cb, $e8 }
-#MACRO set 5, c { db $cb, $e9 }
-#MACRO set 5, d { db $cb, $ea }
-#MACRO set 5, e { db $cb, $eb }
-#MACRO set 5, h { db $cb, $ec }
-#MACRO set 5, l { db $cb, $ed }
-#MACRO set 6, [hl] { db $cb, $f6 }
-#MACRO set 6, a { db $cb, $f7 }
-#MACRO set 6, b { db $cb, $f0 }
-#MACRO set 6, c { db $cb, $f1 }
-#MACRO set 6, d { db $cb, $f2 }
-#MACRO set 6, e { db $cb, $f3 }
-#MACRO set 6, h { db $cb, $f4 }
-#MACRO set 6, l { db $cb, $f5 }
-#MACRO set 7, [hl] { db $cb, $fe }
-#MACRO set 7, a { db $cb, $ff }
-#MACRO set 7, b { db $cb, $f8 }
-#MACRO set 7, c { db $cb, $f9 }
-#MACRO set 7, d { db $cb, $fa }
-#MACRO set 7, e { db $cb, $fb }
-#MACRO set 7, h { db $cb, $fc }
-#MACRO set 7, l { db $cb, $fd }
+#MACRO set _idx, [hl] { db $cb, $c6 | ((_idx) << 3) }
+#MACRO set _idx, a { db $cb, $c7 | ((_idx) << 3) }
+#MACRO set _idx, b { db $cb, $c0 | ((_idx) << 3) }
+#MACRO set _idx, c { db $cb, $c1 | ((_idx) << 3) }
+#MACRO set _idx, d { db $cb, $c2 | ((_idx) << 3) }
+#MACRO set _idx, e { db $cb, $c3 | ((_idx) << 3) }
+#MACRO set _idx, h { db $cb, $c4 | ((_idx) << 3) }
+#MACRO set _idx, l { db $cb, $c5 | ((_idx) << 3) }
 #MACRO sla [hl] { db $cb, $26 }
 #MACRO sla a { db $cb, $27 }
 #MACRO sla b { db $cb, $20 }
@@ -507,6 +344,7 @@
 #MACRO srl l { db $cb, $3d }
 #MACRO stop { db $10, $00 }
 #MACRO stop _value { db $10, _value }
+#MACRO sub _value { sub a, _value }
 #MACRO sub a, [hl] { db $96 }
 #MACRO sub a, _value { db $d6, _value }
 #MACRO sub a, a { db $97 }
