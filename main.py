@@ -8,6 +8,7 @@ from macrodb import MacroDB
 from layout import Layout
 from spaceallocator import SpaceAllocator
 import builtin
+import gfx
 
 
 def tokens_to_string(tokens: List[Token]) -> str:
@@ -113,6 +114,13 @@ class Assembler:
                 if len(params) != 1 or len(params[0]) != 1 or params[0][0].kind != 'STRING':
                     raise AssemblerException(start, "Syntax error")
                 self._include_file(params[0][0])
+            elif start.isA('DIRECTIVE', '#INCGFX'):
+                params = self._fetch_parameters(tok)
+                if len(params) != 1 or len(params[0]) != 1 or params[0][0].kind != 'STRING':
+                    raise AssemblerException(start, "Syntax error")
+                if not self.__section_stack:
+                    raise AssemblerException(start, "Expression outside of section")
+                self.__section_stack[-1].data += gfx.read(params[0][0].value)
             elif start.isA('DIRECTIVE', '#LAYOUT'):
                 self._define_layout(start, tok)
             elif start.isA('DIRECTIVE', '#SECTION'):
