@@ -20,7 +20,7 @@ def read(filename: str, *, tileheight: Optional[int]=None, colormap: List[int]=N
                     break
     assert (img.size[0] % 8) == 0
     if tileheight is None:
-        tileheight = 8 if img.size[1] == 8 else 16
+        tileheight = 8
     assert (img.size[1] % tileheight) == 0
 
     cols = img.size[0] // 8

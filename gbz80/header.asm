@@ -15,7 +15,7 @@
         db $00 ; SGB flag
         db _mbc ; cart type
         db BIT_LENGTH(BANK_MAX(ROMX)) - 1 ; ROM size
-        db $00 ; SRAM size
+        db $02 ; SRAM size
         db $01 ; JP only or worldwide
         db $00 ; Licensee
         db $00 ; Version
