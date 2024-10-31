@@ -76,7 +76,7 @@ class SpaceAllocator:
             for bank, free in sorted(spaces.items()):
                 bank = f" {bank:02x}" if bank is not None else ""
                 if free < sai.total_space():
-                    print(f"  {name:5}{bank:5} {free:5}/{sai.total_space():<5} ({free/sai.total_space()*100}%)")
+                    print(f"  {name:5}{bank:5} {free:5}/{sai.total_space():<5} ({free/sai.total_space()*100:.1f}%)")
 
     def allocate_fixed(self, section_type: str, start: int, length: int, *, bank: Optional[int]=None) -> int:
         return self.__data[section_type].allocate_fixed(start, length, bank=bank)

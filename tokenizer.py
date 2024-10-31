@@ -105,6 +105,7 @@ class Tokenizer:
         while len(self.__tokens) > 1 and self.__tokens[1].isA('TOKENCONCAT'):
             self.__tokens.pop(1)
             token = Token(token.kind, str(token.value) + str(self.__tokens.pop(1).value), token.line_nr, token.filename)
+            self.__tokens[0] = token
         return token
 
     def pop(self) -> Token:
