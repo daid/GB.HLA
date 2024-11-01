@@ -198,7 +198,7 @@ class Assembler:
         if self.__section_stack:
             raise AssemblerException(tok.pop(), f"EOF reached with section open")
 
-    def link(self):
+    def link(self, *, print_free_space=False):
         sa = SpaceAllocator(self.__layouts)
         for section in self.__sections:
             if section.base_address > -1:
@@ -239,7 +239,8 @@ class Assembler:
                         section.data[offset+1] = expr.token.value >> 8
                     else:
                         raise NotImplementedError()
-        sa.dump_free_space()
+        if print_free_space:
+            sa.dump_free_space()
         return self.__sections
 
     def build_rom(self):
@@ -501,8 +502,7 @@ class Assembler:
                         arg.append(tokens[end_idx])
                 raise AssemblerException(start, f"Function not closed: {start.value}")
             if start.kind == 'ID' and start.value in self.__constants:
-                start.kind = 'NUMBER'
-                start.value = self.__constants[start.value]
+                tokens[start_idx] = Token('NUMBER', self.__constants[start.value], start.line_nr, start.filename)
         return parse_expression(tokens)
 
     def _resolve_expr(self, offset: Optional[int], expr: AstNode) -> Optional[AstNode]:
@@ -615,7 +615,7 @@ def main():
     #     if f.endswith(".asm"):
     #         a.process_file("../FFL3-Disassembly/src/" + f)
     a.process_file(args.filename)
-    a.link()
+    a.link(print_free_space=True)
     # for section in a.link():
     #     print(section)
     open("rom.gb", "wb").write(a.build_rom())

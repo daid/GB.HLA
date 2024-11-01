@@ -25,3 +25,6 @@ class TestAssemblerFMacro(unittest.TestCase):
 
     def test_fixed_param3(self):
         self.assertEqual(self._simple("#MACRO TEST _a, _b { db $02 } #MACRO TEST 1, _b { db $03 } #MACRO TEST 1, 1 + _b { db $04 }", "test 1, 1 + 2"), b'\x04')
+
+    def test_reassign(self):
+        self.assertEqual(self._simple("#MACRO TEST _a { VAR = 1 + _a\ndb VAR }", "test 1\ntest 2"), b'\x02\x03')
