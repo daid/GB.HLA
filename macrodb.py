@@ -9,6 +9,8 @@ class Macro:
         self.name = name
         self.params = params
         self.contents = contents
+        self.post_contents = []
+        self.chains = {}
 
         sort_key = []
         for param_idx, param in enumerate(params):
@@ -32,6 +34,11 @@ class Macro:
             if not Macro.match_node_list(params[n], self.params[n], res):
                 return None
         return res
+
+    def add_chain(self, name: str, contents: List[Token]) -> "Macro":
+        chain = Macro(name, self.params, contents)
+        self.chains[name] = chain
+        return chain
 
     @staticmethod
     def match_node_list(a: List[Token], b: List[Token], res: Dict[str, List[Token]]) -> bool:
@@ -64,13 +71,14 @@ class MacroDB:
     def __init__(self):
         self.__macros: Dict[str, Tuple[List[Macro], List[Macro]]] = defaultdict(lambda: ([], []))
 
-    def add(self, name: str, params: List[List[Token]], contents: List[Token]):
+    def add(self, name: str, params: List[List[Token]], contents: List[Token]) -> Macro:
         macro = Macro(name, params, contents)
         if macro.is_constant_params():
             self.__macros[name][0].append(macro)
         else:
             self.__macros[name][1].append(macro)
             self.__macros[name][1].sort(key=Macro.sort_key)
+        return macro
 
     def get(self, name: str, params: List[List[Token]]) -> Optional[Tuple[Macro, Dict[str, List[Token]]]]:
         for macro in self.__macros[name][0]:

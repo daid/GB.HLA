@@ -1,4 +1,4 @@
-from typing import List, Optional, Dict, Tuple
+from typing import List, Optional, Dict, Tuple, Union
 import binascii
 import os
 from tokenizer import Token, Tokenizer
@@ -97,6 +97,7 @@ class Assembler:
 
     def process_code(self, code, *, filename="[string]"):
         self.__section_stack = []
+        self.__block_macro_stack = []
         self.__current_scope = None
         tok = Tokenizer()
         tok.add_code(code, filename=filename)
@@ -192,7 +193,26 @@ class Assembler:
             elif start.isA('ID'):
                 self._process_statement(start, tok)
             elif start.isA('}'):
-                self.__section_stack.pop()
+                if self.__block_macro_stack:
+                    macro, macro_args = self.__block_macro_stack.pop()
+                    macro_contents = macro.post_contents
+                    if tok.peek().isA('ID') and tok.peek().value in macro.chains:
+                        macro = macro.chains[tok.peek().value]
+                        macro_contents = macro.contents
+                        self.__block_macro_stack.append((macro, macro_args))
+                        tok.pop()
+                        tok.expect('{')
+                    prepend = []
+                    for token in macro_contents:
+                        if token.kind == 'ID' and token.value in macro_args:
+                            prepend += macro_args[token.value]
+                        else:
+                            prepend.append(token)
+                    tok.prepend(prepend)
+                elif self.__section_stack:
+                    self.__section_stack.pop()
+                else:
+                    raise AssemblerException(start, f"Unexpected }}")
             else:
                 raise AssemblerException(start, f"Syntax error")
         if self.__section_stack:
@@ -361,7 +381,7 @@ class Assembler:
         self.__sections.append(section)
 
     def _process_statement(self, start: Token, tok: Tokenizer):
-        params = self._fetch_parameters(tok)
+        params, end_token = self._fetch_parameters(tok, params_end=('NEWLINE', '{'))
         macro = self.__macro_db.get(start.value.upper(), params)
         if not macro:
             raise AssemblerException(start, f"Syntax error: {start.value} {params_to_string(params)}")
@@ -373,10 +393,31 @@ class Assembler:
             else:
                 prepend.append(token)
         tok.prepend(prepend)
+        if end_token.isA('{'):
+            self.__block_macro_stack.append((macro, macro_args))
 
     def _add_macro(self, tok: Tokenizer) -> None:
         name = tok.expect('ID')
         params = self._fetch_parameters(tok, params_end='{')
+        content = self._get_raw_macro_block(name, tok)
+        macro = self.__macro_db.add(name.value.upper(), params, content)
+        if tok.peek().isA('ID', 'end'):
+            tok.pop()
+            tok.expect('{')
+            content = self._get_raw_macro_block(name, tok)
+            macro.post_contents = content
+        while tok.peek().isA('ID'):
+            chain_name = tok.pop()
+            tok.expect('{')
+            content = self._get_raw_macro_block(chain_name, tok)
+            chain = macro.add_chain(chain_name.value, content)
+            if tok.peek().isA('ID', 'end'):
+                tok.pop()
+                tok.expect('{')
+                content = self._get_raw_macro_block(name, tok)
+                chain.post_contents = content
+
+    def _get_raw_macro_block(self, name: Token, tok: Tokenizer) -> List[Token]:
         content = []
         bracket = 0
         while token := tok.pop_raw():
@@ -392,7 +433,7 @@ class Assembler:
             raise AssemblerException(name, "Unterminated macro definition")
         if not content[-1].isA('NEWLINE'):
             content.append(Token('NEWLINE', '', 0, ''))
-        self.__macro_db.add(name.value.upper(), params, content)
+        return content
 
     def _add_function(self, tok: Tokenizer) -> None:
         name = tok.expect('ID')
@@ -408,14 +449,19 @@ class Assembler:
             raise AssemblerException(name, "Unterminated function definition")
         self.__func_db.add(name.value.upper(), params, content)
 
-    def _fetch_parameters(self, tok: Tokenizer, *, params_end='NEWLINE') -> List[List[Token]]:
+    def _fetch_parameters(self, tok: Tokenizer, *, params_end: Union[str, Tuple[str, str]]='NEWLINE') -> List[List[Token]]:
         params = []
-        if tok.match(params_end):
+        tok_match = tok.match
+        if not isinstance(params_end, str):
+            tok_match = tok.match_any
+        if end_token := tok_match(params_end):
+            if not isinstance(params_end, str):
+                return params, end_token
             return params
         param = []
         params.append(param)
         brackets = 0
-        while brackets != 0 or not tok.match(params_end):
+        while brackets != 0 or not (end_token := tok_match(params_end)):
             t = tok.pop()
             if t.kind == 'EOF':
                 if params_end != 'NEWLINE':
@@ -449,6 +495,8 @@ class Assembler:
                 if t.kind == 'ID' and t.value.startswith("."):
                     t.value = f"{self.__current_scope}{t.value}"
                 param.append(t)
+        if not isinstance(params_end, str):
+            return params, end_token
         return params
 
     def _bracket_param(self, tokens: List[Token], arg_count: Optional[int] = None):

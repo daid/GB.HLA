@@ -126,5 +126,11 @@ class Tokenizer:
             return self.pop()
         return None
 
+    def match_any(self, kinds) -> Optional[Token]:
+        for kind in kinds:
+            if self.peek().isA(kind):
+                return self.pop()
+        return None
+
     def __bool__(self):
         return len(self.__tokens) > 0
