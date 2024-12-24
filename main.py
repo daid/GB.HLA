@@ -78,6 +78,8 @@ class Assembler:
         self.__layouts: Dict[str, Layout] = {}
         self.__rom = None
         self.__post_build_link = []
+        self.__section_stack = []
+        self.__block_macro_stack = []
 
     def process_file(self, filename):
         self.__include_paths.append(os.path.dirname(filename))
@@ -99,7 +101,7 @@ class Assembler:
         self.__section_stack = []
         self.__block_macro_stack = []
         self.__current_scope = None
-        tok = Tokenizer()
+        tok = Tokenizer(self.__constants)
         tok.add_code(code, filename=filename)
         while start := tok.pop():
             if start.isA('NEWLINE'):
@@ -145,6 +147,26 @@ class Assembler:
                             raise AssemblerException(condition.token, f"Assertion failure: {message}")
                     else:
                         self.__section_stack[-1].asserts.append((len(self.__section_stack[-1].data), condition, message))
+            elif start.isA('DIRECTIVE', '#PRINT'):
+                for expr in self._fetch_parameters(tok):
+                    expr = self._process_expression(expr)
+                    expr = self._resolve_expr(None, expr)
+                    print(expr, end=' ')
+                print()
+            elif start.isA('DIRECTIVE', '#IF'):
+                allow = True
+                for condition in self._fetch_parameters(tok, params_end='{'):
+                    condition = self._process_expression(condition)
+                    condition = self._resolve_expr(None, condition)
+                    if condition.kind != 'value':
+                        raise AssemblerException(condition.token, "#IF needs a constant expression")
+                    if condition.token.kind != 'NUMBER':
+                        raise AssemblerException(condition.token, "#IF needs a constant expression")
+                    allow = allow and (condition.token.value != 0)
+                if allow:
+                    self.__block_macro_stack.append((None, None))  # HACKERDY HACK
+                else:
+                    self._get_raw_macro_block(start, tok)
             elif start.isA('ID', 'DS'):
                 if not self.__section_stack:
                     raise AssemblerException(start, "Expression outside of section")
@@ -195,20 +217,21 @@ class Assembler:
             elif start.isA('}'):
                 if self.__block_macro_stack:
                     macro, macro_args = self.__block_macro_stack.pop()
-                    macro_contents = macro.post_contents
-                    if tok.peek().isA('ID') and tok.peek().value in macro.chains:
-                        macro = macro.chains[tok.peek().value]
-                        macro_contents = macro.contents
-                        self.__block_macro_stack.append((macro, macro_args))
-                        tok.pop()
-                        tok.expect('{')
-                    prepend = []
-                    for token in macro_contents:
-                        if token.kind == 'ID' and token.value in macro_args:
-                            prepend += macro_args[token.value]
-                        else:
-                            prepend.append(token)
-                    tok.prepend(prepend)
+                    if macro is not None:
+                        macro_contents = macro.post_contents
+                        if tok.peek().isA('ID') and tok.peek().value in macro.chains:
+                            macro = macro.chains[tok.peek().value]
+                            macro_contents = macro.contents
+                            self.__block_macro_stack.append((macro, macro_args))
+                            tok.pop()
+                            tok.expect('{')
+                        prepend = []
+                        for token in macro_contents:
+                            if token.kind == 'ID' and token.value in macro_args:
+                                prepend += macro_args[token.value]
+                            else:
+                                prepend.append(token)
+                        tok.prepend(prepend)
                 elif self.__section_stack:
                     self.__section_stack.pop()
                 else:
@@ -449,7 +472,7 @@ class Assembler:
             raise AssemblerException(name, "Unterminated function definition")
         self.__func_db.add(name.value.upper(), params, content)
 
-    def _fetch_parameters(self, tok: Tokenizer, *, params_end: Union[str, Tuple[str, str]]='NEWLINE') -> List[List[Token]]:
+    def _fetch_parameters(self, tok: Tokenizer, *, params_end: Union[str, Tuple[str, str]]='NEWLINE') -> Union[List[List[Token]], Tuple[List[List[Token]], Token]]:
         params = []
         tok_match = tok.match
         if not isinstance(params_end, str):
@@ -510,7 +533,7 @@ class Assembler:
             raise AssemblerException(tokens[1], "Expected '['")
         if tokens[-1].kind != ']':
             raise AssemblerException(tokens[-1], "Expected ']'")
-        t = Tokenizer()
+        t = Tokenizer(self.__constants)
         t.prepend(tokens[2:-1])
         params = self._fetch_parameters(t)
         if arg_count is not None:

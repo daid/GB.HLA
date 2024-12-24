@@ -1,5 +1,5 @@
 import re
-from typing import Optional, List
+from typing import Optional, List, Dict
 from exception import AssemblerException
 
 
@@ -54,9 +54,10 @@ class Tokenizer:
         ('MISMATCH', r'.'),
     ]))
 
-    def __init__(self):
+    def __init__(self, constants: Optional[Dict[str, int]] = None):
         self.__tokens = []
         self.__eof = Token('EOF', '', 0, '')
+        self.__constants = constants if constants is not None else {}
 
     def add_code(self, code, *, filename="[string]") -> None:
         line_nr = 1
@@ -104,7 +105,11 @@ class Tokenizer:
         token = self.__tokens[0]
         while len(self.__tokens) > 1 and self.__tokens[1].isA('TOKENCONCAT'):
             self.__tokens.pop(1)
-            token = Token(token.kind, str(token.value) + str(self.__tokens.pop(1).value), token.line_nr, token.filename)
+            left_side = str(token.value)
+            left_side = str(self.__constants.get(left_side, left_side))
+            right_side = str(self.__tokens.pop(1).value)
+            right_side = str(self.__constants.get(right_side, right_side))
+            token = Token(token.kind, left_side + right_side, token.line_nr, token.filename)
             self.__tokens[0] = token
         return token
 
