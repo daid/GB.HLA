@@ -15,8 +15,8 @@ class TestAssemblerBuiltin(unittest.TestCase):
     def test_basicconcat(self):
         self.assertEqual(self._simple(
             '''
-            a = 1
             b = 2
             ab = 3
+            a2 = 4
             db ab, a ## b
-            '''), b'\x03\x03')
+            '''), b'\x03\x04')
