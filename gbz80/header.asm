@@ -29,3 +29,33 @@
 #MACRO GBC_HEADER _title, _mbc, _entry {
     GB_HEADER_IMPL _title, _mbc, $80, _entry
 }
+
+
+GB_MCB_ROM_ONLY             = $00
+GB_MBC1                     = $01
+GB_MBC1_RAM                 = $02
+GB_MBC1_RAM_BATTERY         = $03
+GB_MBC2                     = $05
+GB_MBC2_BATTERY             = $06
+GB_ROM_RAM                  = $08
+GB_ROM_RAM_BATTERY          = $09
+GB_MMM01                    = $0B
+GB_MMM01_RAM                = $0C
+GB_MMM01_RAM_BATTERY        = $0D
+GB_MBC3_TIMER_BATTERY       = $0F
+GB_MBC3_TIMER_RAM_BATTERY   = $10
+GB_MBC3                     = $11
+GB_MBC3_RAM                 = $12
+GB_MBC3_RAM_BATTERY         = $13
+GB_MBC5                     = $19
+GB_MBC5_RAM                 = $1A
+GB_MBC5_RAM_BATTERY         = $1B
+GB_MBC5_RUMBLE              = $1C
+GB_MBC5_RUMBLE_RAM          = $1D
+GB_MBC5_RUMBLE_RAM_BATTERY  = $1E
+GB_MBC6                     = $20
+GB_MBC7                     = $22
+GB_POCKET_CAMERA            = $FC
+GB_BANDAI_TAMA5             = $FD
+GB_HuC3                     = $FE
+GB_HuC1_RAM_BATTERY         = $FF

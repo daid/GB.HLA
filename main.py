@@ -211,6 +211,8 @@ class Assembler:
                     self.__current_scope = label
                 if label in self.__labels:
                     raise AssemblerException(start, "Duplicate label")
+                if not self.__section_stack:
+                    raise AssemblerException(start, "Trying to place label outside of section")
                 self.__labels[label] = (self.__section_stack[-1], len(self.__section_stack[-1].data))
             elif start.isA('ID'):
                 self._process_statement(start, tok)
@@ -239,7 +241,7 @@ class Assembler:
             else:
                 raise AssemblerException(start, f"Syntax error")
         if self.__section_stack:
-            raise AssemblerException(tok.pop(), f"EOF reached with section open")
+            raise AssemblerException(start, f"End of file reached with section open")
 
     def link(self, *, print_free_space=False):
         sa = SpaceAllocator(self.__layouts)
@@ -675,22 +677,31 @@ class Assembler:
 def main():
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("filename")
+    parser.add_argument("input")
+    parser.add_argument("--output")
+    parser.add_argument("--symbols")
 
     args = parser.parse_args()
-    print(args)
 
-    a = Assembler()
-    # import os
-    # for f in sorted(os.listdir("../FFL3-Disassembly/src")):
-    #     if f.endswith(".asm"):
-    #         a.process_file("../FFL3-Disassembly/src/" + f)
-    a.process_file(args.filename)
-    a.link(print_free_space=True)
-    # for section in a.link():
-    #     print(section)
-    open("rom.gb", "wb").write(a.build_rom())
-    a.save_symbols("rom.sym")
+    try:
+        a = Assembler()
+        a.process_file(args.input)
+        a.link(print_free_space=True)
+    except AssemblerException as e:
+        print(f"Error: {e.message}")
+        print(f" at: {e.token.filename}:{e.token.line_nr}")
+        if os.path.isfile(e.token.filename):
+            lines = open(e.token.filename).readlines()
+            print("-----")
+            for n in range(max(0, e.token.line_nr - 3), min(len(lines), e.token.line_nr + 2)):
+                print(f"{'>' if n == e.token.line_nr - 1 else ' '}  {lines[n].rstrip()}")
+            print("-----")
+        exit(1)
+    else:
+        if args.output:
+            open(args.output, "wb").write(a.build_rom())
+        if args.symbols:
+            a.save_symbols(args.symbols)
 
 
 if __name__ == "__main__":

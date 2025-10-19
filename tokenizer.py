@@ -90,6 +90,8 @@ class Tokenizer:
             self.__tokens.append(Token(kind, value, line_nr, filename))
             if kind == 'NEWLINE':
                 line_nr += 1
+        self.__eof.filename = filename
+        self.__eof.line_nr = line_nr
 
     def prepend(self, tokens: List[Token]):
         self.__tokens = tokens + self.__tokens
