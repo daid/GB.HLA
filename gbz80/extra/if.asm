@@ -7,7 +7,6 @@ _if_enter_counter = 0
 _if_exit_counter = 0
 #MACRO if _cond {
     _if_enter_counter = _if_enter_counter + 1
-    #PRINT "if", _if_enter_counter
     jr invert_condition(_cond), _if_label_ ## _if_enter_counter
 } end {
     _if_current_label_nr = _if_enter_counter - _if_exit_counter
@@ -33,7 +32,6 @@ _if_exit_counter = 0
 
 #MACRO if.jp _cond {
     _if_enter_counter = _if_enter_counter + 1
-    #PRINT "if", _if_enter_counter
     jp invert_condition(_cond), _if_label_ ## _if_enter_counter
 } end {
     _if_current_label_nr = _if_enter_counter - _if_exit_counter

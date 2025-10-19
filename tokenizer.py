@@ -1,16 +1,15 @@
 import re
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 from exception import AssemblerException
+from dataclasses import dataclass
 
 
+@dataclass(frozen=True)
 class Token:
-    __slots__ = 'kind', 'value', 'line_nr', 'filename'
-
-    def __init__(self, kind: str, value, line_nr: int, filename: str):
-        self.kind = kind
-        self.value = value
-        self.line_nr = line_nr
-        self.filename = filename
+    kind: str
+    value: Any
+    line_nr: int
+    filename: str
 
     def isA(self, kind: str, value=None) -> bool:
         if self.kind != kind:
@@ -90,8 +89,7 @@ class Tokenizer:
             self.__tokens.append(Token(kind, value, line_nr, filename))
             if kind == 'NEWLINE':
                 line_nr += 1
-        self.__eof.filename = filename
-        self.__eof.line_nr = line_nr
+        self.__eof = Token('EOF', '', line_nr, filename)
 
     def prepend(self, tokens: List[Token]):
         self.__tokens = tokens + self.__tokens
