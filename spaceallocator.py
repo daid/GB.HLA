@@ -70,7 +70,7 @@ class SpaceAllocator:
         self.__data = {name: SpaceAllocationInfo(layout) for name, layout in layouts.items()}
 
     def dump_free_space(self) -> None:
-        print("Free space:")
+        print("\nFree space:")
         for name, sai in self.__data.items():
             spaces = sai.free_space()
             for bank, free in sorted(spaces.items()):

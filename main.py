@@ -260,9 +260,9 @@ class Assembler:
                 except PostRomBuild:
                     pass
                 if expr.kind != 'value' or expr.token.kind != 'NUMBER':
-                    raise AssemblerException(expr.token, f"Assertion failure (symbol not found?) {expr}")
+                    raise AssemblerException.from_expression(expr, f"Assertion failure (symbol not found?) {expr}")
                 if expr.token.value == 0:
-                    raise AssemblerException(expr.token, f"Assertion failure: {message}")
+                    raise AssemblerException.from_expression(expr, f"Assertion failure: {message}")
             for offset, (link_size, expr) in section.link.items():
                 try:
                     expr = self._resolve_expr(section.base_address + offset, expr)
@@ -270,9 +270,9 @@ class Assembler:
                     self.__post_build_link.append((section, offset, link_size, expr))
                 else:
                     if expr.kind != 'value':
-                        raise AssemblerException(expr.token, f"Failed to parse linking '{expr}', symbol not found?")
+                        raise AssemblerException.from_expression(expr, f"Failed to parse linking '{expr}', symbol not found?")
                     if not expr.token.isA('NUMBER'):
-                        raise AssemblerException(expr.token, f"Failed to link '{expr}', not a number (symbol not found?)")
+                        raise AssemblerException.from_expression(expr, f"Failed to link '{expr}', not a number (symbol not found?)")
                     if link_size == 1:
                         if expr.token.value < -128 or expr.token.value > 255:
                             raise AssemblerException(expr.token, f"Value out of range")
@@ -339,6 +339,35 @@ class Assembler:
                 address = section.base_address + offset
                 bank = section.bank if section.bank is not None else 0
                 f.write(f"{bank:02x}:{address:04x} {label}\n")
+
+    def dump(self):
+        print("\nOutput dump:")
+        for section in self.__sections:
+            bank = section.bank or 0
+            print(f"Section: {section.layout.name}[{bank:02x}]:{section.name}:{section.base_address:04x}")
+            offset_to_label = {}
+            for label, (label_section, label_offset) in self.__labels.items():
+                if section == label_section:
+                    offset_to_label[label_offset] = label
+            byte_idx = 0
+            for offset, c in enumerate(section.data):
+                if offset in offset_to_label:
+                    if byte_idx > 0:
+                        byte_idx = 0
+                        print("")
+                    print(f"{offset_to_label[offset]}:")
+                if byte_idx == 0:
+                    print(" ", end="")
+                print(f" {c:02X}", end="")
+                byte_idx += 1
+                if byte_idx == 16:
+                    print("")
+                    byte_idx = 0
+            if len(section.data) in offset_to_label:
+                if byte_idx > 0:
+                    byte_idx = 0
+                    print("")
+                print(f"{offset_to_label[len(section.data)]}:")
 
     def _define_layout(self, start: Token, tok: Tokenizer):
         params = self._fetch_parameters(tok)
@@ -417,9 +446,15 @@ class Assembler:
                 prepend += macro_args[token.value]
             else:
                 prepend.append(token)
-        tok.prepend(prepend)
         if end_token.isA('{'):
             self.__block_macro_stack.append((macro, macro_args))
+        elif macro.post_contents:
+            for token in macro.post_contents:
+                if token.kind == 'ID' and token.value in macro_args:
+                    prepend += macro_args[token.value]
+                else:
+                    prepend.append(token)
+        tok.prepend(prepend)
 
     def _add_macro(self, tok: Tokenizer) -> None:
         name = tok.expect('ID')
@@ -680,6 +715,7 @@ def main():
     parser.add_argument("input")
     parser.add_argument("--output")
     parser.add_argument("--symbols")
+    parser.add_argument("--dump", action="store_true")
 
     args = parser.parse_args()
 
@@ -702,6 +738,8 @@ def main():
             open(args.output, "wb").write(a.build_rom())
         if args.symbols:
             a.save_symbols(args.symbols)
+        if args.dump:
+            a.dump()
 
 
 if __name__ == "__main__":
