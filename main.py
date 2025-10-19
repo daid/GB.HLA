@@ -272,7 +272,7 @@ class Assembler:
                     if expr.kind != 'value':
                         raise AssemblerException.from_expression(expr, f"Failed to parse linking '{expr}', symbol not found?")
                     if not expr.token.isA('NUMBER'):
-                        raise AssemblerException.from_expression(expr, f"Failed to link '{expr}', not a number (symbol not found?)")
+                        raise AssemblerException.from_expression(expr, f"Failed to link '{expr}', symbol not found?")
                     if link_size == 1:
                         if expr.token.value < -128 or expr.token.value > 255:
                             raise AssemblerException(expr.token, f"Value out of range")
