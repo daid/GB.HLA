@@ -4,7 +4,7 @@ import os
 from tokenizer import Token, Tokenizer
 from expression import AstNode, parse_expression
 from exception import AssemblerException
-from macrodb import MacroDB
+from macrodb import MacroDB, Macro
 from layout import Layout
 from spaceallocator import SpaceAllocator
 import builtin
@@ -21,6 +21,7 @@ def tokens_to_string(tokens: List[Token]) -> str:
         else:
             result += str(t.value)
     return result
+
 
 def params_to_string(params: List[List[Token]]) -> str:
     return ", ".join(tokens_to_string(p) for p in params)
@@ -70,16 +71,16 @@ class Assembler:
     def __init__(self):
         self.__macro_db = MacroDB()
         self.__func_db = MacroDB()
-        self.__constants = {}
-        self.__labels = {}
-        self.__sections = []
-        self.__current_scope = None
+        self.__constants: Dict[str, int] = {}
+        self.__labels: Dict[str, Tuple[Section, int]] = {}
+        self.__sections: List[Section] = []
+        self.__current_scope: Optional[str] = None
         self.__include_paths = [os.path.dirname(__file__)]
         self.__layouts: Dict[str, Layout] = {}
-        self.__rom = None
-        self.__post_build_link = []
-        self.__section_stack = []
-        self.__block_macro_stack = []
+        self.__rom: Optional[bytearray] = None
+        self.__post_build_link: List[Tuple[Section, int, int, AstNode]] = []
+        self.__section_stack: List[Section] = []
+        self.__block_macro_stack: List[Tuple[Macro, Dict[str, List[Token]]]] = []
 
     def process_file(self, filename):
         self.__include_paths.append(os.path.dirname(filename))
@@ -553,7 +554,7 @@ class Assembler:
                 params.append(param)
             else:
                 if t.kind == 'ID' and t.value.startswith("."):
-                    t.value = f"{self.__current_scope}{t.value}"
+                    t = Token('ID', f"{self.__current_scope}{t.value}", t.line_nr, t.filename)
                 param.append(t)
         if not isinstance(params_end, str):
             return params, end_token
