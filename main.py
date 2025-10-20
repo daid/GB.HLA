@@ -81,6 +81,7 @@ class Assembler:
         self.__post_build_link: List[Tuple[Section, int, int, AstNode]] = []
         self.__section_stack: List[Section] = []
         self.__block_macro_stack: List[Tuple[Macro, Dict[str, List[Token]]]] = []
+        self.__user_stack: Dict[str, List[int]] = {}
         self.__linking_allocation_done = False
 
     def process_file(self, filename):
@@ -169,6 +170,34 @@ class Assembler:
                     self.__block_macro_stack.append((None, None))  # HACKERDY HACK
                 else:
                     self._get_raw_macro_block(start, tok)
+            elif start.isA('DIRECTIVE', '#PUSH'):
+                params = self._fetch_parameters(tok)
+                if len(params) != 2:
+                    raise AssemblerException(start, "#PUSH requires 2 parameters: [stack name], [value]")
+                stack_name = self._process_expression(params[0])
+                value = self._process_expression(params[1])
+                if stack_name.kind != "value" or stack_name.token.kind != "ID":
+                    raise AssemblerException(start, "First parameter of #PUSH should be a stack name to push to")
+                if value.kind != "value" or value.token.kind != "NUMBER":
+                    raise AssemblerException(start, "Second parameter of #PUSH should be a value to push")
+                if stack_name.token.value not in self.__user_stack:
+                    self.__user_stack[stack_name.token.value] = []
+                self.__user_stack[stack_name.token.value].append(value.token.value)
+            elif start.isA('DIRECTIVE', '#POP'):
+                params = self._fetch_parameters(tok)
+                if len(params) != 2 or len(params[1]) != 1:
+                    raise AssemblerException(start, "#PUSH requires 2 parameters: [stack name], [value]")
+                stack_name = self._process_expression(params[0])
+                value = params[1][0]
+                if stack_name.kind != "value" or stack_name.token.kind != "ID":
+                    raise AssemblerException(start, "First parameter of #POP should be a stack name to push to")
+                if value.kind != "ID":
+                    raise AssemblerException(start, "Second parameter of #POP should be a constant name to pop")
+                if stack_name.token.value not in self.__user_stack:
+                    raise AssemblerException(start, f"Stack {stack_name.token.value} not found")
+                if not self.__user_stack[stack_name.token.value]:
+                    raise AssemblerException(start, f"Stack {stack_name.token.value} is empty while trying to pop")
+                self.__constants[value.value] = self.__user_stack[stack_name.token.value].pop()
             elif start.isA('ID', 'DS'):
                 if not self.__section_stack:
                     raise AssemblerException(start, "Expression outside of section")
