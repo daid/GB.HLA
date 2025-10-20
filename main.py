@@ -238,7 +238,7 @@ class Assembler:
                 label = start.value
                 if start.value.startswith("."):
                     label = f"{self.__current_scope}{label}"
-                else:
+                elif not start.value.startswith("__"):
                     self.__current_scope = label
                 if label in self.__labels:
                     raise AssemblerException(start, "Duplicate label")
