@@ -31,3 +31,17 @@ class TestIf(unittest.TestCase):
         }
         """)
         self.assertEqual(rom, b'\x20\x03\xF0\x18\x01\x0F')
+
+    def test_nested(self):
+        rom = self._full("""
+        if z {
+            db $F0
+            if nz {
+                db $FF
+            }
+            db $EE
+        } else {
+            db $0F
+        }
+        """)
+        self.assertEqual(rom, b'\x20\x07\xF0\x28\x01\xFF\xEE\x18\x01\x0F')
