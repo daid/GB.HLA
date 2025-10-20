@@ -28,7 +28,8 @@ def params_to_string(params: List[List[Token]]) -> str:
 
 
 class PostRomBuild(Exception):
-    pass
+    def __init__(self, priority):
+        self.priority = priority
 
 
 class Section:
@@ -78,7 +79,7 @@ class Assembler:
         self.__include_paths = [os.path.dirname(__file__)]
         self.__layouts: Dict[str, Layout] = {}
         self.__rom: Optional[bytearray] = None
-        self.__post_build_link: List[Tuple[Section, int, int, AstNode]] = []
+        self.__post_build_link: List[Tuple[int, Section, int, int, AstNode]] = []
         self.__section_stack: List[Section] = []
         self.__block_macro_stack: List[Tuple[Macro, Dict[str, List[Token]]]] = []
 
@@ -267,8 +268,8 @@ class Assembler:
             for offset, (link_size, expr) in section.link.items():
                 try:
                     expr = self._resolve_expr(section.base_address + offset, expr)
-                except PostRomBuild:
-                    self.__post_build_link.append((section, offset, link_size, expr))
+                except PostRomBuild as e:
+                    self.__post_build_link.append((e.priority, section, offset, link_size, expr))
                 else:
                     if expr.kind != 'value':
                         raise AssemblerException.from_expression(expr, f"Failed to parse linking '{expr}', symbol not found?")
@@ -312,7 +313,8 @@ class Assembler:
             if section.layout.banked:
                 offset += (section.layout.end_addr - section.layout.start_addr) * (section.bank - section.layout.bank_min)
             self.__rom[offset:offset+len(section.data)] = section.data
-        for section, offset, link_size, expr in self.__post_build_link:
+        self.__post_build_link.sort(key=lambda t: -t[0])
+        for priority, section, offset, link_size, expr in self.__post_build_link:
             if section.layout.rom_location is None:
                 continue
             offset = section.layout.rom_location + section.base_address - section.layout.start_addr + offset
@@ -364,11 +366,22 @@ class Assembler:
                 if byte_idx == 16:
                     print("")
                     byte_idx = 0
+            if byte_idx > 0:
+                byte_idx = 0
+                print("")
             if len(section.data) in offset_to_label:
-                if byte_idx > 0:
-                    byte_idx = 0
-                    print("")
                 print(f"{offset_to_label[len(section.data)]}:")
+    
+    def get_label(self, label: str) -> Tuple[Section, int]:
+        if label in self.__labels:
+            return self.__labels[label]
+        return None, None
+    
+    def get_sections(self, layout_name: str) -> List[Section]:
+        return [section for section in self.__sections if section.layout.name == layout_name]
+    
+    def get_rom(self):
+        return self.__rom
 
     def _define_layout(self, start: Token, tok: Tokenizer):
         params = self._fetch_parameters(tok)
@@ -594,11 +607,11 @@ class Assembler:
                         func = builtin.get(start.value.upper())
                         if func is None:
                             raise RuntimeError("_fetch_parameters allowed a non-builting through?")
-                        contents = func(self, args)
-                        if contents is None:
-                            return parse_expression(tokens)
-                        else:
+                        if func.function_type == "macro":
+                            contents = func(self, args)
                             tokens = tokens[:start_idx] + contents + tokens[end_idx + 1:]
+                        else:
+                            return parse_expression(tokens)
                         return self._process_expression(tokens)
                     elif t.isA(',') and brackets == 0:
                         args.append(arg)
@@ -629,41 +642,17 @@ class Assembler:
                 return expr
             expr.token = Token('NUMBER', offset, expr.token.line_nr, expr.token.filename)
         elif expr.kind == 'call':
-            if expr.token.value == 'BANK':
-                label_token = expr.right.left.token
-                if label_token.value not in self.__labels:
-                    return expr
-                section, section_offset = self.__labels[label_token.value]
-                if section.base_address < 0:
-                    return expr
-                bank = section.bank if section.bank is not None else 0
-                return AstNode('value', Token('NUMBER', bank, expr.token.line_nr, expr.token.filename), None, None)
-            elif expr.token.value == 'BANK_MAX':
-                if self.__rom is None:
-                    raise PostRomBuild()
-                count = 0
-                for section in self.__sections:
-                    if section.layout.name == expr.right.left.token.value:
-                        count = max(count, section.bank if section.bank is not None else 0)
-                return AstNode('value', Token('NUMBER', count, expr.token.line_nr, expr.token.filename), None, None)
-            elif expr.token.value == 'CHECKSUM':
-                if self.__rom is None:
-                    raise PostRomBuild()
-                start, end = 0, len(self.__rom)
-                if expr.right:
-                    if not expr.right.left.is_number():
-                        return expr
-                    if not expr.right.right.left.is_number():
-                        return expr
-                    start, end = expr.right.left.token.value, expr.right.right.left.token.value
-                return AstNode('value', Token('NUMBER', sum(self.__rom[start:end]), expr.token.line_nr, expr.token.filename), None, None)
-            elif expr.token.value == 'BIT_LENGTH':
+            func = builtin.get(expr.token.value)
+            if func.function_type == "postlink":
+                if not self.__rom:
+                    raise PostRomBuild(func.priority)
+                res = func(self, expr.right)
+            elif func.function_type == "function":
                 expr = self._resolve_expr(offset, expr.right.left)
-                if not expr.is_number():
-                    raise AssemblerException(expr.token, "BIT_LENGTH parameter is not a number")
-                return AstNode('value', Token('NUMBER', expr.token.value.bit_length(), expr.token.line_nr, expr.token.filename), None, None)
+                res = func(self, expr)
             else:
-                raise NotImplementedError(str(expr))
+                raise RuntimeError(f"Not implemented: {func.function_type}")
+            return res
         else:
             expr.left = self._resolve_expr(offset, expr.left)
             expr.right = self._resolve_expr(offset, expr.right)
