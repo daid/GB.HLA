@@ -72,9 +72,9 @@ def checksum(assembler, param: AstNode) -> AstNode:
     start, end = 0, len(assembler.get_rom())
     if param:
         if not param.left.is_number():
-            return expr
+            raise AssemblerException(param.token, "Expected a number to checksum")
         if not param.right.left.is_number():
-            return expr
+            raise AssemblerException(param.token, "Expected a number to checksum")
         start, end = param.left.token.value, param.right.left.token.value
     return AstNode('value', Token('NUMBER', sum(assembler.get_rom()[start:end]), 0, ""), None, None)
 
