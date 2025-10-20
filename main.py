@@ -28,8 +28,7 @@ def params_to_string(params: List[List[Token]]) -> str:
 
 
 class PostRomBuild(Exception):
-    def __init__(self, priority):
-        self.priority = priority
+    pass
 
 
 class Section:
@@ -79,9 +78,10 @@ class Assembler:
         self.__include_paths = [os.path.dirname(__file__)]
         self.__layouts: Dict[str, Layout] = {}
         self.__rom: Optional[bytearray] = None
-        self.__post_build_link: List[Tuple[int, Section, int, int, AstNode]] = []
+        self.__post_build_link: List[Tuple[Section, int, int, AstNode]] = []
         self.__section_stack: List[Section] = []
         self.__block_macro_stack: List[Tuple[Macro, Dict[str, List[Token]]]] = []
+        self.__linking_allocation_done = False
 
     def process_file(self, filename):
         self.__include_paths.append(os.path.dirname(filename))
@@ -255,6 +255,7 @@ class Assembler:
                 bank, addr = sa.allocate(section.layout.name, len(section.data), bank=section.bank)
                 section.bank = bank
                 section.base_address = addr
+        self.__linking_allocation_done = True
         for section in self.__sections:
             for offset, expr, message in section.asserts:
                 try:
@@ -268,8 +269,8 @@ class Assembler:
             for offset, (link_size, expr) in section.link.items():
                 try:
                     expr = self._resolve_expr(section.base_address + offset, expr)
-                except PostRomBuild as e:
-                    self.__post_build_link.append((e.priority, section, offset, link_size, expr))
+                except PostRomBuild:
+                    self.__post_build_link.append((section, offset, link_size, expr))
                 else:
                     if expr.kind != 'value':
                         raise AssemblerException.from_expression(expr, f"Failed to parse linking '{expr}', symbol not found?")
@@ -313,8 +314,7 @@ class Assembler:
             if section.layout.banked:
                 offset += (section.layout.end_addr - section.layout.start_addr) * (section.bank - section.layout.bank_min)
             self.__rom[offset:offset+len(section.data)] = section.data
-        self.__post_build_link.sort(key=lambda t: -t[0])
-        for priority, section, offset, link_size, expr in self.__post_build_link:
+        for section, offset, link_size, expr in self.__post_build_link:
             if section.layout.rom_location is None:
                 continue
             offset = section.layout.rom_location + section.base_address - section.layout.start_addr + offset
@@ -643,9 +643,13 @@ class Assembler:
             expr.token = Token('NUMBER', offset, expr.token.line_nr, expr.token.filename)
         elif expr.kind == 'call':
             func = builtin.get(expr.token.value)
-            if func.function_type == "postlink":
+            if func.function_type == "link":
+                if not self.__linking_allocation_done:
+                    raise PostRomBuild()
+                res = func(self, expr.right)
+            elif func.function_type == "postbuild":
                 if not self.__rom:
-                    raise PostRomBuild(func.priority)
+                    raise PostRomBuild()
                 res = func(self, expr.right)
             elif func.function_type == "function":
                 expr = self._resolve_expr(offset, expr.right.left)

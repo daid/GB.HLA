@@ -7,13 +7,16 @@ from expression import AstNode
 _buildin_functions = {}
 
 
-def builtin(function_type="macro", priority=100):
+def builtin(function_type="macro"):
     def wrapper(f):
         f.function_type = function_type
-        f.priority = priority
         _buildin_functions[f.__name__.upper()] = f
         return f
     return wrapper
+
+
+def get(fname: str):
+    return _buildin_functions.get(fname)
 
 
 @builtin()
@@ -33,7 +36,7 @@ def bit_length(assembler, param: AstNode) -> AstNode:
     return AstNode('value', Token('NUMBER', param.token.value.bit_length(), param.token.line_nr, param.token.filename), None, None)
 
 
-@builtin(function_type="postlink")
+@builtin(function_type="link")
 def bank(assembler, param: AstNode) -> AstNode:
     if param.right:
         raise AssemblerException(param.token, "bank requires 1 argument")
@@ -50,19 +53,7 @@ def bank(assembler, param: AstNode) -> AstNode:
     return AstNode('value', Token('NUMBER', bank, label_token.line_nr, label_token.filename), None, None)
 
 
-@builtin(function_type="postlink", priority=10)
-def checksum(assembler, param: AstNode) -> AstNode:
-    start, end = 0, len(assembler.get_rom())
-    if param:
-        if not param.left.is_number():
-            return expr
-        if not param.right.left.is_number():
-            return expr
-        start, end = param.left.token.value, param.right.left.token.value
-    return AstNode('value', Token('NUMBER', sum(assembler.get_rom()[start:end]), 0, ""), None, None)
-
-
-@builtin(function_type="postlink")
+@builtin(function_type="link")
 def bank_max(assembler, param: AstNode) -> AstNode:
     if param.right:
         raise AssemblerException(param.token, "bank_max requires 1 argument")
@@ -76,6 +67,14 @@ def bank_max(assembler, param: AstNode) -> AstNode:
     return AstNode('value', Token('NUMBER', count, label_token.line_nr, label_token.filename), None, None)
 
 
+@builtin(function_type="postbuild")
+def checksum(assembler, param: AstNode) -> AstNode:
+    start, end = 0, len(assembler.get_rom())
+    if param:
+        if not param.left.is_number():
+            return expr
+        if not param.right.left.is_number():
+            return expr
+        start, end = param.left.token.value, param.right.left.token.value
+    return AstNode('value', Token('NUMBER', sum(assembler.get_rom()[start:end]), 0, ""), None, None)
 
-def get(fname: str):
-    return _buildin_functions.get(fname)
