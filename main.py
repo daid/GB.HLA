@@ -489,7 +489,18 @@ class Assembler:
                 prepend += macro_args[token.value]
             else:
                 prepend.append(token)
-        if end_token.isA('{'):
+        if macro.linked:
+            prepend.append(macro.linked[0])
+            for linked_param in macro.linked[1]:
+                for token in linked_param:
+                    if token.kind == 'ID' and token.value in macro_args:
+                        prepend += macro_args[token.value]
+                    else:
+                        prepend.append(token)
+                if linked_param != macro.linked[1][-1]:
+                    prepend.append(Token(",", ",", 0, ""))
+            prepend.append(end_token)
+        elif end_token.isA('{'):
             self.__block_macro_stack.append((macro, macro_args))
         elif macro.post_contents:
             for token in macro.post_contents:
@@ -519,6 +530,12 @@ class Assembler:
                 tok.expect('{')
                 content = self._get_raw_macro_block(name, tok)
                 chain.post_contents = content
+        if tok.match('>'):
+            if macro.post_contents or macro.chains:
+                raise AssemblerException(name, "Macros with chains/post actions cannot be linked to other macros")
+            linked_macro = tok.expect('ID')
+            linked_params = self._fetch_parameters(tok)
+            macro.linked = (linked_macro, linked_params)
 
     def _get_raw_macro_block(self, name: Token, tok: Tokenizer) -> List[Token]:
         content = []
@@ -576,7 +593,7 @@ class Assembler:
                     fparams = self._fetch_parameters(tok, params_end=')')
                     func = self.__func_db.get(t.value.upper(), fparams)
                     if func is None:
-                        raise AssemblerException(t, f"Function not found: {t.value}")
+                        raise AssemblerException(t, f"Function not found: [{t.value}] with params: {', '.join(tokens_to_string(p) for p in fparams)}")
                     func, func_args = func
                     for token in func.contents:
                         if token.kind == 'ID' and token.value in func_args:

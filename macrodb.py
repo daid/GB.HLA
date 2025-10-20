@@ -11,6 +11,7 @@ class Macro:
         self.contents = contents
         self.post_contents = []
         self.chains = {}
+        self.linked = None
 
         sort_key = []
         for param_idx, param in enumerate(params):

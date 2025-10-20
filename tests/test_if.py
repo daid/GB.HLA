@@ -45,3 +45,22 @@ class TestIf(unittest.TestCase):
         }
         """)
         self.assertEqual(rom, b'\x20\x07\xF0\x28\x01\xFF\xEE\x18\x01\x0F')
+
+    def test_prefix(self):
+        rom = self._full("""
+#MACRO my_if {
+    and a
+} > if z
+#MACRO my_if _cond {
+    and b
+} > if _cond
+        my_if {
+            db $F0
+        }
+        my_if nz {
+            db $F0
+        } else {
+            db $0F
+        }
+        """)
+        self.assertEqual(rom, b'\xA7\x20\x01\xF0\xA0\x28\x03\xF0\x18\x01\x0F')

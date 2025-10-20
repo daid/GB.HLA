@@ -40,3 +40,6 @@ class TestAssemblerFMacro(unittest.TestCase):
 
     def test_block_macro_chain2(self):
         self.assertEqual(self._simple("#MACRO TEST { db 1 } end { db 2 } else { db 4 }", "test { db 3\n}\ntest { db 6\n} else { db 7\n }"), b'\x01\x03\x02\x01\x06\x04\x07')
+
+    def test_link(self):
+        self.assertEqual(self._simple("#MACRO TEST _a, _b { db _a, _b } #MACRO TEST2 { db $01 } > TEST 2, 3", "TEST2"), b'\x01\x02\x03')
