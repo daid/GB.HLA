@@ -130,7 +130,7 @@ class Assembler:
                 gfx_params = {}
                 for param in params[1:]:
                     pkey, pvalue = self._bracket_param(param)
-                    gfx_params[pkey.value] = pvalue
+                    gfx_params[pkey.value] = [self._resolve_expr(None, param) for param in pvalue]
                 self.__section_stack[-1].data += gfx.read(params[0][0], gfx_params)
             elif start.isA('DIRECTIVE', '#LAYOUT'):
                 self._define_layout(start, tok)

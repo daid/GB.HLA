@@ -8,6 +8,9 @@ from typing import List, Dict, Any
 def read(file_token: Token, options: Dict[str, List[Any]]) -> bytes:
     tileheight = 8
     colormap = None
+    unique = False
+    return_tilemap = False
+    export_range = None
     if "tileheight" in options:
         if len(options["tileheight"]) != 1 or options["tileheight"][0].kind != "value":
             raise AssemblerException(file_token, "Syntax error in tileheight[n]")
@@ -21,6 +24,20 @@ def read(file_token: Token, options: Dict[str, List[Any]]) -> bytes:
                 raise AssemblerException(file_token, "Syntax error in colormap[n, n, n, n]")
             colormap.append(options["colormap"][n].token.value)
         options.pop("colormap")
+    if "unique" in options:
+        if len(options.pop("unique")) != 0:
+            raise AssemblerException(file_token, "Syntax error in unique[]")
+        unique = True
+    if "tilemap" in options:
+        if len(options.pop("tilemap")) != 0:
+            raise AssemblerException(file_token, "Syntax error in tilemap[]")
+        unique = True
+        return_tilemap = True
+    if "range" in options:
+        if len(options["range"]) != 2:
+            raise AssemblerException(file_token, "Syntax error in range[start, end]")
+        export_range = options["range"][0].token.value, options["range"][1].token.value
+        options.pop("range")
     if options:
         raise AssemblerException(file_token, f"Unknown option: {next(iter(options.keys()))}")
 
@@ -62,4 +79,24 @@ def read(file_token: Token, options: Dict[str, List[Any]]) -> bytes:
                 result[index] = a
                 result[index+1] = b
                 index += 2
+    if unique:
+        unique_tiles = b''
+        tile_lookup = {}
+        tilemap = bytearray()
+        for n in range(0, len(result), tileheight * 2):
+            tile = bytes(result[n:n+tileheight*2])
+            if tile not in tile_lookup:
+                nr = len(unique_tiles) // (tileheight*2)
+                if nr > 255:
+                    raise AssemblerException(file_token, "Too many unique tiles in graphics for tilemap")
+                tile_lookup[tile] = nr
+                unique_tiles += tile
+            tilemap.append(tile_lookup[tile])
+        if return_tilemap:
+            if export_range:
+                return tilemap[export_range[0]:export_range[1]]
+            return tilemap
+        result = unique_tiles
+    if export_range:
+        return result[export_range[0]*tileheight*2:export_range[1]*tileheight*2]
     return result
