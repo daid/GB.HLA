@@ -123,11 +123,15 @@ class Assembler:
                 self._include_file(params[0][0])
             elif start.isA('DIRECTIVE', '#INCGFX'):
                 params = self._fetch_parameters(tok)
-                if len(params) != 1 or len(params[0]) != 1 or params[0][0].kind != 'STRING':
+                if len(params[0]) != 1 or params[0][0].kind != 'STRING':
                     raise AssemblerException(start, "Syntax error")
                 if not self.__section_stack:
                     raise AssemblerException(start, "Expression outside of section")
-                self.__section_stack[-1].data += gfx.read(params[0][0].value)
+                gfx_params = {}
+                for param in params[1:]:
+                    pkey, pvalue = self._bracket_param(param)
+                    gfx_params[pkey.value] = pvalue
+                self.__section_stack[-1].data += gfx.read(params[0][0], gfx_params)
             elif start.isA('DIRECTIVE', '#LAYOUT'):
                 self._define_layout(start, tok)
             elif start.isA('DIRECTIVE', '#SECTION'):
