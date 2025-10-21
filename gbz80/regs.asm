@@ -27,7 +27,27 @@ rNR44 = $FF23
 rNR50 = $FF24
 rNR51 = $FF25
 rNR52 = $FF26
+
+; -- LCDC ($FF40) -------------------------------------------------------------
+; PPU graphics control
 rLCDC = $FF40
+LCDC_OFF        = $00
+LCDC_ON         = $80
+LCDC_WIN_9800   = $00
+LCDC_WIN_9C00   = $40
+LCDC_WIN_OFF    = $00
+LCDC_WIN_ON     = $20
+LCDC_BLOCK21    = $00
+LCDC_BLOCK01    = $10
+LCDC_BG_9800    = $00
+LCDC_BG_9C00    = $08
+LCDC_OBJ_8      = $00
+LCDC_OBJ_16     = $04
+LCDC_OBJ_OFF    = $00
+LCDC_OBJ_ON     = $02
+LCDC_BG_OFF     = $00
+LCDC_BG_ON      = $01
+
 rSTAT = $FF41
 rSCY = $FF42
 rSCX = $FF43
@@ -55,4 +75,12 @@ rOPRI = $FF6C
 rSVBK = $FF70
 rPCM12 = $FF76
 rPCM34 = $FF77
+
+; -- IE ($FFFF) ---------------------------------------------------------------
+; Interrupt enable
 rIE = $FFFF
+IE_JOYPAD = $10
+IE_SERIAL = $08
+IE_TIMER  = $04
+IE_STAT   = $02
+IE_VBLANK = $01

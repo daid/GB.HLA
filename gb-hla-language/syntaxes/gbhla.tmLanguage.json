@@ -23,7 +23,7 @@
 				"match": "\\b(z|nz|c|nc)\\b"
 			},{
 				"name": "keyword",
-				"match": "\\b(adc|add|bit|call|ccf|cp|cpl|daa|dec|di|ei|halt|inc|jp|jr|ld|ldh|nop|or|pop|push|res|ret|reti|lr|rla|rlc|rlca|rr|rra|rrc|rrca|rst|sbc|scf|set|sla|sra|srl|stop|sub|swap|xor)\\b"
+				"match": "\\b(adc|add|and|bit|call|ccf|cp|cpl|daa|dec|di|ei|halt|inc|jp|jr|ld|ldh|nop|or|pop|push|res|ret|reti|lr|rla|rlc|rlca|rr|rra|rrc|rrca|rst|sbc|scf|set|sla|sra|srl|stop|sub|swap|xor)\\b"
 			}]
 		},
 		"numbers": {
