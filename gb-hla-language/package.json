@@ -1,0 +1,25 @@
+{
+  "name": "gb-hla-language",
+  "displayName": "GB.HLA Language",
+  "description": "Syntax highlight for GB.HLA",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.105.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [{
+      "id": "gbhla",
+      "aliases": ["GB.HLA", "gbhla"],
+      "extensions": [".asm"],
+      "configuration": "./language-configuration.json"
+    }],
+    "grammars": [{
+      "language": "gbhla",
+      "scopeName": "source.gbhla",
+      "path": "./syntaxes/gbhla.tmLanguage.json"
+    }]
+  }
+}

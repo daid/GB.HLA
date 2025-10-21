@@ -1,0 +1,60 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "GB.HLA",
+	"patterns": [
+		{"include": "#keywords"},
+		{"include": "#comments"},
+		{"include": "#numbers"},
+		{"include": "#strings"}
+	],
+	"repository": {
+		"keywords": {
+			"patterns": [{
+				"name": "meta.preprocessor",
+				"match": "^#\\w+"
+			},{
+				"name": "variable.other",
+				"match": "^\\.?\\w+:"
+			},{
+				"name": "variable.register",
+				"match": "\\b(a|b|c|d|e|h|l|af|bc|de|hl)\\b"
+			},{
+				"name": "variable.condition",
+				"match": "\\b(z|nz|c|nc)\\b"
+			},{
+				"name": "keyword",
+				"match": "\\b(adc|add|bit|call|ccf|cp|cpl|daa|dec|di|ei|halt|inc|jp|jr|ld|ldh|nop|or|pop|push|res|ret|reti|lr|rla|rlc|rlca|rr|rra|rrc|rrca|rst|sbc|scf|set|sla|sra|srl|stop|sub|swap|xor)\\b"
+			}]
+		},
+		"numbers": {
+			"patterns": [{
+				"name": "constant.numeric",
+				"match": "\\b[0-9]+\\b"
+			},{
+				"name": "constant.numeric",
+				"match": "\\b\\$[0-9a-fA-F][0-9a-fA-F_]+\\b"
+			},{
+				"name": "constant.numeric",
+				"match": "\\b\\%[0-1][0-1_]+\\b"
+			}]
+		},
+		"comments": {
+			"patterns": [{
+				"name": "comment.line",
+				"match": ";.*"
+			}]
+		},
+		"strings": {
+			"name": "string.quoted.double.gbhla",
+			"begin": "\"",
+			"end": "\"",
+			"patterns": [
+				{
+					"name": "constant.character.escape.gbhla",
+					"match": "\\\\."
+				}
+			]
+		}
+	},
+	"scopeName": "source.gbhla"
+}
