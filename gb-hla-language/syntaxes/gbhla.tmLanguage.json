@@ -16,6 +16,9 @@
 				"name": "variable.other",
 				"match": "^\\.?\\w+:"
 			},{
+				"name": "variable.other",
+				"match": "\\s\\.?\\w+:"
+			},{
 				"name": "variable.register",
 				"match": "\\b(a|b|c|d|e|h|l|af|bc|de|hl)\\b"
 			},{

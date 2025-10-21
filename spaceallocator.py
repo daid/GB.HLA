@@ -23,7 +23,7 @@ class SpaceAllocationInfo:
     def total_space(self):
         return self.__layout.end_addr - self.__layout.start_addr
 
-    def allocate_fixed(self, start: int, length: int, *, bank: Optional[int]) -> Optional[int]:
+    def allocate_fixed(self, start: int, length: int, *, bank: Optional[int]) -> bool:
         if bank is not None:
             while bank >= self.__next_free_bank:
                 self.__new_bank()
@@ -37,10 +37,10 @@ class SpaceAllocationInfo:
                     self.__available.append((b, s, start))
                 if e > end:
                     self.__available.append((b, end, e))
-                return b
-        raise AssemblerException(None, f"Failed to allocate fixed region: {start:04x}-{end:04x} in bank {bank}")
+                return True
+        return False
 
-    def allocate(self, length: int, bank: Optional[int]=None) -> Tuple[Optional[int], int]:
+    def allocate(self, length: int, bank: Optional[int] = None) -> Optional[Tuple[Optional[int], int]]:
         if bank is not None:
             while bank >= self.__next_free_bank:
                 self.__new_bank()
@@ -54,7 +54,7 @@ class SpaceAllocationInfo:
                     self.__available.pop(idx)
                 return b, s
         if bank is not None or not self.__layout.banked:
-            raise AssemblerException(None, f"Failed to allocate region: {length:04x}")
+            return None
         self.__new_bank()
         return self.allocate(length, bank)
 
@@ -81,5 +81,5 @@ class SpaceAllocator:
     def allocate_fixed(self, section_type: str, start: int, length: int, *, bank: Optional[int]=None) -> int:
         return self.__data[section_type].allocate_fixed(start, length, bank=bank)
 
-    def allocate(self, section_type: str, length: int, bank=None) -> Tuple[Optional[int], int]:
+    def allocate(self, section_type: str, length: int, bank=None) -> Optional[Tuple[Optional[int], int]]:
         return self.__data[section_type].allocate(length, bank=bank)

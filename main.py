@@ -32,9 +32,10 @@ class PostRomBuild(Exception):
 
 
 class Section:
-    def __init__(self, layout: Layout, name: str, base_address: Optional[int] = None, bank: Optional[int] = None) -> None:
+    def __init__(self, layout: Layout, name_token: Token, base_address: Optional[int] = None, bank: Optional[int] = None) -> None:
         self.layout = layout
-        self.name = name
+        self.name = name_token.value
+        self.token = name_token
         self.base_address = base_address if base_address is not None else -1
         self.bank = bank
         self.data = bytearray()
@@ -278,10 +279,14 @@ class Assembler:
         sa = SpaceAllocator(self.__layouts)
         for section in self.__sections:
             if section.base_address > -1:
-                sa.allocate_fixed(section.layout.name, section.base_address, len(section.data))
+                if not sa.allocate_fixed(section.layout.name, section.base_address, len(section.data), bank=section.bank):
+                    raise AssemblerException(section.token, f"Failed to allocate fixed region: {section.base_address:04x}-{section.base_address+len(section.data):04x}")
         for section in self.__sections:
             if section.base_address < 0:
-                bank, addr = sa.allocate(section.layout.name, len(section.data), bank=section.bank)
+                bank_addr = sa.allocate(section.layout.name, len(section.data), bank=section.bank)
+                if bank_addr is None:
+                    raise AssemblerException(section.token, f"Failed to allocate region of size: {len(section.data):04x}")
+                bank, addr = bank_addr
                 section.bank = bank
                 section.base_address = addr
         self.__linking_allocation_done = True
@@ -459,7 +464,7 @@ class Assembler:
         layout = self.__layouts[section_type.value]
         if address > -1 and not (layout.start_addr <= address < layout.end_addr):
             raise AssemblerException(section_type, "Address out of range for section")
-        section = Section(layout, name.token.value, address)
+        section = Section(layout, name.token, address)
         for param in params[2:]:
             pkey, pvalue = self._bracket_param(param)
             if pkey.value == 'BANK':
@@ -765,13 +770,14 @@ def main():
         a.link(print_free_space=True)
     except AssemblerException as e:
         print(f"Error: {e.message}")
-        print(f" at: {e.token.filename}:{e.token.line_nr}")
-        if os.path.isfile(e.token.filename):
-            lines = open(e.token.filename).readlines()
-            print("-----")
-            for n in range(max(0, e.token.line_nr - 3), min(len(lines), e.token.line_nr + 2)):
-                print(f"{'>' if n == e.token.line_nr - 1 else ' '}  {lines[n].rstrip()}")
-            print("-----")
+        if e.token:
+            print(f" at: {e.token.filename}:{e.token.line_nr}")
+            if os.path.isfile(e.token.filename):
+                lines = open(e.token.filename).readlines()
+                print("-----")
+                for n in range(max(0, e.token.line_nr - 3), min(len(lines), e.token.line_nr + 2)):
+                    print(f"{'>' if n == e.token.line_nr - 1 else ' '}  {lines[n].rstrip()}")
+                print("-----")
         exit(1)
     else:
         if args.output:
