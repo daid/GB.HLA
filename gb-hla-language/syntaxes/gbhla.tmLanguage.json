@@ -11,13 +11,10 @@
 		"keywords": {
 			"patterns": [{
 				"name": "meta.preprocessor",
-				"match": "^#\\w+"
+				"match": "^ *#\\w+"
 			},{
 				"name": "variable.other",
-				"match": "^\\.?\\w+:"
-			},{
-				"name": "variable.other",
-				"match": "\\s\\.?\\w+:"
+				"match": "^ *[\\.\\w]+:"
 			},{
 				"name": "variable.register",
 				"match": "\\b(a|b|c|d|e|h|l|af|bc|de|hl)\\b"
@@ -35,10 +32,10 @@
 				"match": "\\b[0-9]+\\b"
 			},{
 				"name": "constant.numeric",
-				"match": "\\b\\$[0-9a-fA-F][0-9a-fA-F_]+\\b"
+				"match": "\\$[0-9a-fA-F][0-9a-fA-F_]+"
 			},{
 				"name": "constant.numeric",
-				"match": "\\b\\%[0-1][0-1_]+\\b"
+				"match": "\\%\\b[0-1][0-1_]+"
 			}]
 		},
 		"comments": {
