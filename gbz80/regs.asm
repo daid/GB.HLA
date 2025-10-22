@@ -195,8 +195,6 @@ rRP = $FF56
 RP_DISABLE = %00_000000
 RP_ENABLE  = %11_000000
 
-B_RP_DATA_IN equ 1 ; 0 = IR light is being received [ro]
-B_RP_LED_ON  equ 0 ; 1 = IR light is being sent     [r/w]
 RP_DATA_IN = $02
 RP_LED_ON  = $01
 

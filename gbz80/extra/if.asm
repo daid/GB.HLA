@@ -1,3 +1,11 @@
+; Conditional if {} macros to use with gbz80
+; These can be used as:
+;   if z {}
+;   if.jp z {}
+;   if z {} else {}
+;   if z {} else.jp {}
+; And support full nesting and being linked into other macros:
+; #MACRO if.a.zero { and a } > if z
 
 #FMACRO invert_condition c { nc }
 #FMACRO invert_condition z { nz }
