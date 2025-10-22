@@ -36,8 +36,8 @@ class Token:
 class Tokenizer:
     TOKEN_REGEX = re.compile('|'.join('(?P<%s>%s)' % pair for pair in [
         ('NUMBER', r'\d+(\.\d*)?'),
-        ('HEX', r'\$[0-9A-Fa-f]+'),
-        ('BIN', r'%[0-1]+'),
+        ('HEX', r'\$[0-9A-Fa-f][0-9A-Fa-f_]*'),
+        ('BIN', r'%[0-1][0-1_]*'),
         ('GFX', r'`[0-3]+'),
         ('COMMENT', r';[^\n]*'),
         ('LABEL', r':'),
@@ -68,10 +68,16 @@ class Tokenizer:
             if kind == 'NUMBER':
                 value = int(value)
             elif kind == 'HEX':
-                value = int(str(value)[1:], 16)
+                try:
+                    value = int(str(value)[1:], 16)
+                except ValueError:
+                    raise AssemblerException(Token(kind, value, line_nr, filename), "Syntax error")
                 kind = 'NUMBER'
             elif kind == 'BIN':
-                value = int(str(value)[1:], 2)
+                try:
+                    value = int(str(value)[1:], 2)
+                except ValueError:
+                    raise AssemblerException(Token(kind, value, line_nr, filename), "Syntax error")
                 kind = 'NUMBER'
             elif kind == 'GFX':
                 value = int(str(value)[1:], 4)

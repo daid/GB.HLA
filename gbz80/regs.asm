@@ -1,6 +1,20 @@
-rP1 = $FF00
+; -- JOYP / P1 ($FF00) --------------------------------------------------------
+; Joypad face buttons
+rP1   = $FF00
+rJOYP = $FF00
+JOYP_GET_BUTTONS    = %00_01_0000 ; reading A/B/Select/Start buttons
+JOYP_GET_CTRL_PAD   = %00_10_0000 ; reading Control Pad directions
+JOYP_GET_NONE       = %00_11_0000 ; reading nothing
+JOYP_INPUTS         = %00_00_1111 ; bits equal to 0 indicate pressed (when reading inputs)
+
+; -- SB ($FF01) ---------------------------------------------------------------
+; Serial transfer data [r/w]
 rSB = $FF01
+
+; -- SC ($FF02) ---------------------------------------------------------------
+; Serial transfer control
 rSC = $FF02
+
 rDIV = $FF04
 rTIMA = $FF05
 rTMA = $FF06
