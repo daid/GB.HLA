@@ -164,30 +164,38 @@ class Assembler:
             elif start.isA('DIRECTIVE', '#IF'):
                 allow = True
                 for condition in self._fetch_parameters(tok, params_end='{'):
-                    condition = self._process_expression(condition)
-                    condition = self._resolve_expr(None, condition)
-                    if condition.kind != 'value':
-                        raise AssemblerException(condition.token, "#IF needs a constant expression")
-                    if condition.token.kind != 'NUMBER':
-                        raise AssemblerException(condition.token, "#IF needs a constant expression")
-                    allow = allow and (condition.token.value != 0)
+                    value = self._resolve_to_number(condition)
+                    allow = allow and (value != 0)
                 if allow:
                     self.__block_macro_stack.append((None, None))  # HACKERDY HACK
                 else:
                     self._get_raw_macro_block(start, tok)
+            elif start.isA('DIRECTIVE', '#FOR'):
+                parameters = self._fetch_parameters(tok, params_end='{')
+                if len(parameters) != 3:
+                    raise AssemblerException(start, "#FOR syntax error")
+                if len(parameters[0]) != 1 or parameters[0][0].kind != 'ID':
+                    raise AssemblerException(start, "#FOR syntax error")
+                counter_name = parameters[0][0].value
+                begin_value = self._resolve_to_number(parameters[1])
+                end_value = self._resolve_to_number(parameters[2])
+                tokens = self._get_raw_macro_block(start, tok)
+                step = 1 if end_value >= begin_value else -1
+                prepend = []
+                for n in range(begin_value, end_value, step):
+                    prepend += [token if token.kind != 'ID' or token.value != counter_name else Token('NUMBER', n, start.line_nr, start.filename) for token in tokens]
+                tok.prepend(prepend)
             elif start.isA('DIRECTIVE', '#PUSH'):
                 params = self._fetch_parameters(tok)
                 if len(params) != 2:
                     raise AssemblerException(start, "#PUSH requires 2 parameters: [stack name], [value]")
                 stack_name = self._process_expression(params[0])
-                value = self._process_expression(params[1])
+                value = self._resolve_to_number(params[1])
                 if stack_name.kind != "value" or stack_name.token.kind != "ID":
                     raise AssemblerException(start, "First parameter of #PUSH should be a stack name to push to")
-                if value.kind != "value" or value.token.kind != "NUMBER":
-                    raise AssemblerException(start, "Second parameter of #PUSH should be a value to push")
                 if stack_name.token.value not in self.__user_stack:
                     self.__user_stack[stack_name.token.value] = []
-                self.__user_stack[stack_name.token.value].append(value.token.value)
+                self.__user_stack[stack_name.token.value].append(value)
             elif start.isA('DIRECTIVE', '#POP'):
                 params = self._fetch_parameters(tok)
                 if len(params) != 2 or len(params[1]) != 1:
@@ -207,14 +215,10 @@ class Assembler:
                 if not self.__section_stack:
                     raise AssemblerException(start, "Expression outside of section")
                 for param in self._fetch_parameters(tok):
-                    param = self._resolve_expr(None, self._process_expression(param))
-                    if param.kind != 'value':
-                        raise AssemblerException(param.token, "DS needs a constant number")
-                    if param.token.kind != 'NUMBER':
-                        raise AssemblerException(param.token, "DS needs a constant number")
-                    if param.token.value < 0:
+                    value = self._resolve_to_number(param)
+                    if value < 0:
                         raise AssemblerException(param.token, "DS needs a positive number")
-                    self.__section_stack[-1].data += bytes(param.token.value)
+                    self.__section_stack[-1].data += bytes(value)
             elif start.isA('ID', 'DB'):
                 if not self.__section_stack:
                     raise AssemblerException(start, "Expression outside of section")
@@ -230,14 +234,7 @@ class Assembler:
                 params = self._fetch_parameters(tok)
                 if len(params) != 1:
                     raise AssemblerException(start, "Syntax error")
-                expr = self._process_expression(params[0])
-                try:
-                    expr = self._resolve_expr(None, expr)
-                except PostRomBuild:
-                    pass
-                if not expr.is_number():
-                    raise AssemblerException(expr.token, "Assignment requires constant expression")
-                self.__constants[start.value] = expr.token.value
+                self.__constants[start.value] = self._resolve_to_number(params[0])
             elif start.isA('ID') and tok.peek().isA('LABEL'):
                 tok.pop()
                 label = start.value
@@ -756,6 +753,12 @@ class Assembler:
                 expr.left = None
                 expr.right = None
         return expr
+
+    def _resolve_to_number(self, tokens: List[Token]) -> int:
+        result = self._resolve_expr(None, self._process_expression(tokens))
+        if not result.is_number():
+            raise AssemblerException(result.token, "Expected a constant expression")
+        return result.token.value
 
 
 def main():
