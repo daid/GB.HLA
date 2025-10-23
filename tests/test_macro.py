@@ -43,3 +43,15 @@ class TestAssemblerFMacro(unittest.TestCase):
 
     def test_link(self):
         self.assertEqual(self._simple("#MACRO TEST _a, _b { db _a, _b } #MACRO TEST2 { db $01 } > TEST 2, 3", "TEST2"), b'\x01\x02\x03')
+
+    def test_duplicate_definition(self):
+        with self.assertRaises(AssemblerException) as context:
+            self._simple('#MACRO TEST { db 1 }\n#MACRO TEST { db 2}', "")
+
+    def test_duplicate_definition_args(self):
+        with self.assertRaises(AssemblerException) as context:
+            self._simple('#MACRO TEST _a { db 1 }\n#MACRO TEST _b { db 2}', "")
+
+    def test_duplicate_definition_args_complex(self):
+        with self.assertRaises(AssemblerException) as context:
+            self._simple('#MACRO TEST [_a] { db 1 }\n#MACRO TEST [_b] { db 2}', "")

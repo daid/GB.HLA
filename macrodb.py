@@ -41,6 +41,19 @@ class Macro:
         self.chains[name] = chain
         return chain
 
+    def is_equal(self, other: "Macro") -> bool:
+        if len(self.params) != len(other.params):
+            return False
+        for p0, p1 in zip(self.params, other.params):
+            if len(p0) != len(p1):
+                return False
+            for t0, t1 in zip(p0, p1):
+                if t0.kind == 'ID' and t0.value.startswith("_") and t1.kind == 'ID' and t1.value.startswith("_"):
+                    pass
+                elif not t0.match(t1):
+                    return False
+        return True
+
     @staticmethod
     def match_node_list(a: List[Token], b: List[Token], res: Dict[str, List[Token]]) -> bool:
         a_idx = 0
@@ -72,11 +85,17 @@ class MacroDB:
     def __init__(self):
         self.__macros: Dict[str, Tuple[List[Macro], List[Macro]]] = defaultdict(lambda: ([], []))
 
-    def add(self, name: str, params: List[List[Token]], contents: List[Token]) -> Macro:
+    def add(self, name: str, params: List[List[Token]], contents: List[Token]) -> Optional[Macro]:
         macro = Macro(name, params, contents)
         if macro.is_constant_params():
+            for other_macro in self.__macros[name][0]:
+                if other_macro.is_equal(macro):
+                    return None
             self.__macros[name][0].append(macro)
         else:
+            for other_macro in self.__macros[name][1]:
+                if other_macro.is_equal(macro):
+                    return None
             self.__macros[name][1].append(macro)
             self.__macros[name][1].sort(key=Macro.sort_key)
         return macro

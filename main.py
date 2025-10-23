@@ -521,6 +521,8 @@ class Assembler:
         params = self._fetch_parameters(tok, params_end='{')
         content = self._get_raw_macro_block(name, tok)
         macro = self.__macro_db.add(name.value.upper(), params, content)
+        if macro is None:
+            raise AssemblerException(name, "Duplicate macro")
         if tok.peek().isA('ID', 'end'):
             tok.pop()
             tok.expect('{')
@@ -573,7 +575,8 @@ class Assembler:
             content.append(token)
         if token is None:
             raise AssemblerException(name, "Unterminated function definition")
-        self.__func_db.add(name.value.upper(), params, content)
+        if self.__func_db.add(name.value.upper(), params, content) is None:
+            raise AssemblerException(name, "Duplicate fmacro")
 
     def _fetch_parameters(self, tok: Tokenizer, *, params_end: Union[str, Tuple[str, str]]='NEWLINE') -> Union[List[List[Token]], Tuple[List[List[Token]], Token]]:
         params = []
