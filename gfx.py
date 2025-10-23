@@ -5,7 +5,7 @@ from tokenizer import Token
 from typing import List, Dict, Any
 
 
-def _bool_option(options: Dict[str, List[Any]], key: str) -> bool:
+def _bool_option(file_token: Token, options: Dict[str, List[Any]], key: str) -> bool:
     if key not in options:
         return False
     if len(options.pop(key)) != 0:
@@ -16,10 +16,10 @@ def _bool_option(options: Dict[str, List[Any]], key: str) -> bool:
 def read(file_token: Token, options: Dict[str, List[Any]]) -> bytes:
     tileheight = 8
     colormap = None
-    unique = _bool_option(options, "UNIQUE")
-    return_tilemap = _bool_option(options, "TILEMAP")
+    unique = _bool_option(file_token, options, "UNIQUE")
+    return_tilemap = _bool_option(file_token, options, "TILEMAP")
     export_range = None
-    debug = _bool_option(options, "DEBUG")
+    debug = _bool_option(file_token, options, "DEBUG")
     if "TILEHEIGHT" in options:
         if len(options["TILEHEIGHT"]) != 1 or options["TILEHEIGHT"][0].kind != "value":
             raise AssemblerException(file_token, "Syntax error in TILEHEIGHT[n]")
