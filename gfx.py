@@ -33,6 +33,11 @@ def read(file_token: Token, options: Dict[str, List[Any]]) -> bytes:
                 raise AssemblerException(file_token, "Syntax error in COLORMAP[n, n, n, n]")
             colormap.append(options["COLORMAP"][n].token.value)
         options.pop("COLORMAP")
+    if "RANGE" in options:
+        if len(options["RANGE"]) != 2:
+            raise AssemblerException(file_token, "Syntax error in RANGE[start, end]")
+        export_range = options["RANGE"][0].token.value, options["RANGE"][1].token.value
+        options.pop("RANGE")
     if options:
         raise AssemblerException(file_token, f"Unknown option: {next(iter(options.keys()))}")
 
