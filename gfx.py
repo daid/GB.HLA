@@ -5,39 +5,34 @@ from tokenizer import Token
 from typing import List, Dict, Any
 
 
+def _bool_option(options: Dict[str, List[Any]], key: str) -> bool:
+    if key not in options:
+        return False
+    if len(options.pop(key)) != 0:
+        raise AssemblerException(file_token, f"Syntax error in {key}, expected no values after it")
+    return True
+
+
 def read(file_token: Token, options: Dict[str, List[Any]]) -> bytes:
     tileheight = 8
     colormap = None
-    unique = False
-    return_tilemap = False
+    unique = _bool_option(options, "UNIQUE")
+    return_tilemap = _bool_option(options, "TILEMAP")
     export_range = None
-    if "tileheight" in options:
-        if len(options["tileheight"]) != 1 or options["tileheight"][0].kind != "value":
-            raise AssemblerException(file_token, "Syntax error in tileheight[n]")
-        tileheight = options.pop("tileheight")[0].token.value
-    if "colormap" in options:
-        if len(options["colormap"]) != 4:
-            raise AssemblerException(file_token, "Syntax error in colormap[n, n, n, n]")
+    debug = _bool_option(options, "DEBUG")
+    if "TILEHEIGHT" in options:
+        if len(options["TILEHEIGHT"]) != 1 or options["TILEHEIGHT"][0].kind != "value":
+            raise AssemblerException(file_token, "Syntax error in TILEHEIGHT[n]")
+        tileheight = options.pop("TILEHEIGHT")[0].token.value
+    if "COLORMAP" in options:
+        if len(options["COLORMAP"]) != 4:
+            raise AssemblerException(file_token, "Syntax error in COLORMAP[n, n, n, n]")
         colormap = []
         for n in range(4):
-            if options["colormap"][n].kind != "value":
-                raise AssemblerException(file_token, "Syntax error in colormap[n, n, n, n]")
-            colormap.append(options["colormap"][n].token.value)
-        options.pop("colormap")
-    if "unique" in options:
-        if len(options.pop("unique")) != 0:
-            raise AssemblerException(file_token, "Syntax error in unique[]")
-        unique = True
-    if "tilemap" in options:
-        if len(options.pop("tilemap")) != 0:
-            raise AssemblerException(file_token, "Syntax error in tilemap[]")
-        unique = True
-        return_tilemap = True
-    if "range" in options:
-        if len(options["range"]) != 2:
-            raise AssemblerException(file_token, "Syntax error in range[start, end]")
-        export_range = options["range"][0].token.value, options["range"][1].token.value
-        options.pop("range")
+            if options["COLORMAP"][n].kind != "value":
+                raise AssemblerException(file_token, "Syntax error in COLORMAP[n, n, n, n]")
+            colormap.append(options["COLORMAP"][n].token.value)
+        options.pop("COLORMAP")
     if options:
         raise AssemblerException(file_token, f"Unknown option: {next(iter(options.keys()))}")
 
@@ -57,9 +52,17 @@ def read(file_token: Token, options: Dict[str, List[Any]]) -> bytes:
             dist = [abs((pal & 0xFF) - (col & 0xFF)) + abs(((pal >> 8) & 0xFF) - ((col >> 8) & 0xFF)) + abs(((pal >> 16) & 0xFF) - ((col >> 16) & 0xFF)) for col in colormap]
             remap.append(dist.index(min(dist)))
     else:
+        remap = [0 for n in range(len(palette))]
         # Per default order the colors from light to dark
-        remap = [n * 4 // len(palette) for n in range(len(palette))]
-        remap.sort(key=lambda n: (palette[n] >> 16) + ((palette[n] >> 8) & 0xFF) + (palette[n] & 0xFF), reverse=True)
+        brightness_index = [((palette[index] >> 16) + ((palette[index] >> 8) & 0xFF) + (palette[index] & 0xFF), index) for count, index in img.getcolors()]
+        brightness_index.sort(reverse=True)
+        for target, (_, idx) in enumerate(brightness_index):
+            remap[idx] = target * 4 // len(brightness_index)
+
+    if debug:
+        print(f"Image: {file_token.value}: {img.size[0]}x{img.size[1]} has colors:")
+        for count, index in img.getcolors():
+            print(f"  ${palette[index]:06X}: mapped: {remap[index]} (x{count})")
 
     cols = img.size[0] // 8
     rows = img.size[1] // tileheight
@@ -79,7 +82,7 @@ def read(file_token: Token, options: Dict[str, List[Any]]) -> bytes:
                 result[index] = a
                 result[index+1] = b
                 index += 2
-    if unique:
+    if unique or return_tilemap:
         unique_tiles = b''
         tile_lookup = {}
         tilemap = bytearray()
