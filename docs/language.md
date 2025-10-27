@@ -12,11 +12,11 @@ statement ; comment
 
 ## #MACRO
 
-Macros are complex enough that they require their own [page](macros)
+Macros are complex enough that they require their own [page](macros.md)
 
 ## #FMACRO
 
-FMacros are function macros. These allow macros inside statements in the form of functions. The definition syntaxs is the same as basic [macros](macros).
+FMacros are function macros. These allow macros inside statements in the form of functions. The definition syntaxs is the same as basic [macros](macros.md).
 
 ### Example:
 ```asm
