@@ -152,3 +152,27 @@ Labels are defined with `identifier:`. There are 3 types of labels in the code:
 * General labels, any label that isn't one of the others fall in this category.
 * Local labels, these start with a `.` and are expanded into a full label form of `previous_general_label.this_label`.
 * Non-scoped labels. These labels won't start a new local scope for local labels, and are useful for macros. These labels start with a double underscore: `__`
+
+# Builtin functions
+
+There are a few builtin functions that provide functionality that cannot be achieved with just macros.
+
+## BANK(...)
+
+Returns the bank of the specified label.
+
+## strlen(...)
+
+Returns the length of the given string.
+
+## bit_length(...)
+
+Returns the number of bits needed to represent the number. Also known as the highest set bit.
+
+## bank_max(...)
+
+Returns the highest bank number of the specified layout name. This is used to generate the GB rom header to specifiy the number of ROM/RAM banks but can be useful for other purposes.
+
+## checksum(...)
+
+Is used to calculate a checksum, this is done after a complete ROM build. Without parameters (`checksum()`) it calculates a checksum over the whole rom. With parameters it specifies the begin (inclusive) and end (exclusive) range of the checksum calculation, in bytes of the final ROM file (`checksum($100, $150)`)
