@@ -155,6 +155,31 @@
               <ul class="nav flex-column">
               </ul>
             </li>
+            
+            <li class="nav-item" data-bs-level="1"><a href="#builtin-functions" class="nav-link">Builtin functions</a>
+              <ul class="nav flex-column">
+            <li class="nav-item" data-bs-level="2"><a href="#bank" class="nav-link">BANK(...)</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#strlen" class="nav-link">strlen(...)</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#bit_length" class="nav-link">bit_length(...)</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#bank_max" class="nav-link">bank_max(...)</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#checksum" class="nav-link">checksum(...)</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+              </ul>
+            </li>
         </ul>
     </div>
 </div></div>
@@ -262,7 +287,19 @@ titleScreenTiles:
 <p>Labels are defined with <code>identifier:</code>. There are 3 types of labels in the code:
 * General labels, any label that isn't one of the others fall in this category.
 * Local labels, these start with a <code>.</code> and are expanded into a full label form of <code>previous_general_label.this_label</code>.
-* Non-scoped labels. These labels won't start a new local scope for local labels, and are useful for macros. These labels start with a double underscore: <code>__</code></p></div>
+* Non-scoped labels. These labels won't start a new local scope for local labels, and are useful for macros. These labels start with a double underscore: <code>__</code></p>
+<h1 id="builtin-functions">Builtin functions</h1>
+<p>There are a few builtin functions that provide functionality that cannot be achieved with just macros.</p>
+<h2 id="bank">BANK(...)</h2>
+<p>Returns the bank of the specified label.</p>
+<h2 id="strlen">strlen(...)</h2>
+<p>Returns the length of the given string.</p>
+<h2 id="bit_length">bit_length(...)</h2>
+<p>Returns the number of bits needed to represent the number. Also known as the highest set bit.</p>
+<h2 id="bank_max">bank_max(...)</h2>
+<p>Returns the highest bank number of the specified layout name. This is used to generate the GB rom header to specifiy the number of ROM/RAM banks but can be useful for other purposes.</p>
+<h2 id="checksum">checksum(...)</h2>
+<p>Is used to calculate a checksum, this is done after a complete ROM build. Without parameters (<code>checksum()</code>) it calculates a checksum over the whole rom. With parameters it specifies the begin (inclusive) and end (exclusive) range of the checksum calculation, in bytes of the final ROM file (<code>checksum($100, $150)</code>)</p></div>
             </div>
         </div>
 
