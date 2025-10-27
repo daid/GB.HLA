@@ -40,3 +40,30 @@ loop:
 To build the rom run the command `python3 [path-to-GB.HLA]/main.py main.asm --output rom.gb --symbols rom.sym` this will create your rom and the respective `.sym` file for debugging. It will also output how much space is free in the rom.
 
 You can now load this rom in any Emulator and run it. Nothing will happen, but there will also be no error. And if you enter the debugger, you will see the `entry` label.
+
+## Core concepts
+
+Unlike other assemblers, GB.HLA makes extensive use of scoping with `{}` characters, and allows indenting of everything. This allows you to build a more C like structure of your code. It allows nesting of sections and macros. This might sound confusing now, but it's extremely powerful to build a better structure of your code.
+
+Example:
+```asm
+#SECTION "Main code", ROM0 {
+    call clearGraphics
+    #SECTION "Graphics", ROMX {
+        graphicsData:
+            #INCGFX "graphics.png"
+    }
+    ld   hl, graphicsData ; This code directly follows the call to clearGraphics
+    ld   a,  BANK(graphicsData)
+    call loadGraphics
+    loop {  ; endless loop from "gbz80/extra/loop.asm"
+        ldh  a, [hInputButtons]
+        and  a
+        if   nz { ; if macro "gbz80/extra/if.asm"
+            call handleInput
+        } else {
+            call handleIdle
+        }
+    }
+}
+```

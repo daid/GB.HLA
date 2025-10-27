@@ -121,6 +121,20 @@ class Assembler:
                 if len(params) != 1 or len(params[0]) != 1 or params[0][0].kind != 'STRING':
                     raise AssemblerException(start, "Syntax error")
                 self._include_file(params[0][0])
+            elif start.isA('DIRECTIVE', '#INCBIN'):
+                params = self._fetch_parameters(tok)
+                if len(params[0]) != 1 or params[0][0].kind != 'STRING':
+                    raise AssemblerException(start, "Syntax error")
+                if not self.__section_stack:
+                    raise AssemblerException(start, "Expression outside of section")
+                bin_params = {}
+                for param in params[1:]:
+                    pkey, pvalue = self._bracket_param(param)
+                    bin_params[pkey.value] = [self._resolve_expr(None, param) for param in pvalue]
+                if bin_params:
+                    raise AssemblerException(file_token, f"Unknown option: {next(iter(bin_params.keys()))}")
+                with open(params[0][0].token.value, "rb") as f:
+                    self.__section_stack[-1].data += f.read()
             elif start.isA('DIRECTIVE', '#INCGFX'):
                 params = self._fetch_parameters(tok)
                 if len(params[0]) != 1 or params[0][0].kind != 'STRING':
