@@ -43,6 +43,9 @@
                             <li class="nav-item">
                                 <a href="./" class="nav-link active" aria-current="page">Language Reference</a>
                             </li>
+                            <li class="nav-item">
+                                <a href="../macros/" class="nav-link">Macros</a>
+                            </li>
                         </ul>
 
                     <ul class="nav navbar-nav ms-md-auto">
@@ -57,7 +60,7 @@
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a rel="next" class="nav-link disabled">
+                                <a rel="next" href="../macros/" class="nav-link">
                                     Next <i class="fa fa-arrow-right"></i>
                                 </a>
                             </li>
@@ -96,15 +99,19 @@
               <ul class="nav flex-column">
               </ul>
             </li>
+            <li class="nav-item" data-bs-level="2"><a href="#incbin" class="nav-link">#INCBIN</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
             <li class="nav-item" data-bs-level="2"><a href="#incgfx" class="nav-link">#INCGFX</a>
               <ul class="nav flex-column">
               </ul>
             </li>
-            <li class="nav-item" data-bs-level="2"><a href="#layout" class="nav-link">#LAYOUT</a>
+            <li class="nav-item" data-bs-level="2"><a href="#section" class="nav-link">#SECTION</a>
               <ul class="nav flex-column">
               </ul>
             </li>
-            <li class="nav-item" data-bs-level="2"><a href="#section" class="nav-link">#SECTION</a>
+            <li class="nav-item" data-bs-level="2"><a href="#layout" class="nav-link">#LAYOUT</a>
               <ul class="nav flex-column">
               </ul>
             </li>
@@ -124,11 +131,7 @@
               <ul class="nav flex-column">
               </ul>
             </li>
-            <li class="nav-item" data-bs-level="2"><a href="#push" class="nav-link">#PUSH</a>
-              <ul class="nav flex-column">
-              </ul>
-            </li>
-            <li class="nav-item" data-bs-level="2"><a href="#pop" class="nav-link">#POP</a>
+            <li class="nav-item" data-bs-level="2"><a href="#push-pop" class="nav-link">#PUSH / #POP</a>
               <ul class="nav flex-column">
               </ul>
             </li>
@@ -164,34 +167,102 @@ Example:</p>
 ; comment
     statement
 </code></pre>
+<blockquote>
+<p>NOTE: GB.HLA supports all the Game Boy assembly instructions in <code>gbz80/instr.asm</code>. There are not documented here, but a reference can be found at <a href="https://rgbds.gbdev.io/docs/v0.9.4/gbz80.7">RGBDS</a></p>
+</blockquote>
 <h2 id="macro">#MACRO</h2>
-<p>TODO: Macros are complex enough that they require their own page</p>
+<p>Macros are complex enough that they require their own <a href="macros">page</a></p>
 <h2 id="fmacro">#FMACRO</h2>
-<p>TODO</p>
+<p>FMacros are function macros. These allow macros inside statements in the form of functions. The definition syntaxs is the same as basic <a href="macros">macros</a>.</p>
+<h3 id="example">Example:</h3>
+<pre><code class="language-asm">#FMACRO add2 _n { (_n + 2) }
+
+db add2(2) ; this will put 4 in the ROM
+</code></pre>
 <h2 id="include">#INCLUDE</h2>
 <p>Reads and fully parses the given file. This allows for splitting your project into multiple files and also to include libraries into your project.</p>
-<h3 id="example">Example:</h3>
+<h3 id="example_1">Example:</h3>
 <pre><code class="language-asm">#INCLUDE &quot;gbz80/all.asm&quot; ; include default set of gbz80 ASM instructions
 #INCLUDE &quot;mylib/rand.asm&quot; ; include a file from your project
 </code></pre>
+<h2 id="incbin">#INCBIN</h2>
+<p>Directly import a binary file. Usually the binary file is generated with an external tool. Example:</p>
+<pre><code class="language-asm">#INCBIN &quot;file.bin&quot;
+</code></pre>
 <h2 id="incgfx">#INCGFX</h2>
-<p>TODO</p>
-<h2 id="layout">#LAYOUT</h2>
-<p>TODO</p>
+<p>The <code>#INCGFX</code> directive allows you to include a graphics file converted to Game Boy format directly into the ROM.</p>
+<p>The <code>#INCGFX</code> directive expects a filename as first parameter, and <code>KEY[VALUE]</code> parameters after this. The parameters influence how the graphics are imported:</p>
+<ul>
+<li><code>TILEHEIGHT[8]</code>, <code>TILEHEIGHT[16]</code>. The 8 pixel height tiles are the default. This imports each 8x8 tile in the file, from the left to the right then top to bottom. With a height of 16, these tiles are 8x16 pixels. Which are generally used for OAM sprites.</li>
+<li><code>COLORMAP[a, b, c, d]</code>. Setup which 4 colors to use for the 4 gameboy colors. Each pixel in the file is mapped to closest of these 4 colors.</li>
+<li><code>RANGE[start, end]</code>. Only store tiles from start (inclusive) to end (exclusive). This allows a single image to be used for multiple blocks of data in the ROM.</li>
+<li><code>UNIQUE</code>. Remove all duplicate tiles from the graphics. This you would generally combine with a 2nd <code>#INCGFX</code> that uses <code>TILEMAP</code>.</li>
+<li><code>TILEMAP</code>. Automatically selects <code>UNIQUE</code> but adds a list of bytes that all refer to a line generated by the <code>UNIQUE</code> set.</li>
+<li><code>DEBUG</code>. Output the found colors in the image and how they map to each of the Game Boy colors, useful to debug <code>COLORMAP</code> issues.</li>
+</ul>
+<h3 id="example_2">Example:</h3>
+<pre><code class="language-asm">    #INCGFX &quot;grayscale.png&quot;
+sprites:
+    #INCGFX &quot;sprites.png&quot;, TILEHEIGHT[16], COLORMAP[$FF00FF, $000000, $808080, $FFFFFF]
+titleScreenGraphics:
+    #INCGFX &quot;titlescreen.png&quot;, UNIQUE
+titleScreenTiles:
+    #INCGFX &quot;titlescreen.png&quot;, TILEMAP
+</code></pre>
 <h2 id="section">#SECTION</h2>
-<p>TODO</p>
+<p>Create a section of code/data. You use this to define where code/data is located. And follows the following syntax: <code>#SECTION "name", LAYOUT_NAME[address], BANK[number] {</code>. Sections need to be closed with <code>}</code> but can be nested. The <code>address</code> and <code>BANK[...]</code> are optional.</p>
+<h3 id="example_3">Example:</h3>
+<pre><code class="language-asm">#SECTION &quot;Free standing section&quot;, ROMX {
+    db &quot;This can be placed anywhere in rom except for bank 0.&quot;
+}
+#SECTION &quot;Fixed address&quot;, ROMX[$4000] {
+    db &quot;This section can be in any bank, but is forced on the first address of the bank.&quot;
+}
+#SECTION &quot;Fixed bank&quot;, ROMX, BANK[4] {
+    db &quot;This section can be placed anywhere in bank 4.&quot;
+}
+</code></pre>
+<h2 id="layout">#LAYOUT</h2>
+<p>The <code>#LAYOUT</code> directive is used to define the layout of the ROM and memory map of the Game Boy. You generally do not need to bother where these, as they are defined in <code>gbz80/layout.asm</code>. If you have some custom cardridge that requires specialized this is where you want to look.</p>
 <h2 id="assert">#ASSERT</h2>
-<p>TODO</p>
+<p>The <code>#ASSERT</code> directive allows you to check if a condition is true and else abort the build with a message. Multiple conditions can be checked at the same time with the same message.</p>
+<h3 id="example_4">Example:</h3>
+<pre><code class="language-asm">#ASSERT var == 1, &quot;var needs to be 1&quot;
+#ASSERT var &gt; 0, var &lt; 10, &quot;var needs to be between 1 and 9 (inclusive)&quot;
+</code></pre>
 <h2 id="print">#PRINT</h2>
-<p>TODO</p>
+<p>The <code>#PRINT</code> directive allows you to output a value during the assembly process. Useful for debugging the assembly process.</p>
+<h3 id="example_5">Example:</h3>
+<pre><code class="language-asm">#PRINT &quot;We can print strings&quot;, 303 ; or numbers
+</code></pre>
 <h2 id="if">#IF</h2>
+<p>The <code>#IF</code> directive is used to conditionally enable/disable parts of the code.</p>
+<h3 id="example_6">Example:</h3>
+<pre><code class="language-asm">#IF var {
+    db &quot;This is only added to the ROM if var is not 0&quot;
+}
+</code></pre>
 <h2 id="for">#FOR</h2>
-<h2 id="push">#PUSH</h2>
-<h2 id="pop">#POP</h2>
+<p>The <code>#FOR</code> directive allows you to repeat a certain bit of code multiple times. It expects 3 parameters. A variable name, a start value and an end value. The start is inclusive, the end is exclusive.</p>
+<h3 id="example_7">Example:</h3>
+<pre><code class="language-asm">#FOR var, 1, 10 {
+    db var ; this will add $01, $02, $03, $04, $05, $06, $07, $08, $09
+}
+</code></pre>
+<h2 id="push-pop">#PUSH / #POP</h2>
+<p>The <code>#PUSH</code> and <code>#POP</code> directives are used to push and pop values on a stack during assembly. This is especially useful for nested macros.</p>
 <h1 id="other">Other</h1>
 <h2 id="ds-db-dw">ds, db, dw</h2>
+<p>The <code>ds</code> statement expects a number behind it and adds that amount of zeros to the RAM. Or if it's RAM allocates that amount of memory in RAM.</p>
+<p>The <code>db</code> statement adds bytes to the ROM.</p>
+<p>The <code>dw</code> statement adds words (16bit) values to the ROM in little endian order.</p>
 <h2 id="assignment">assignment</h2>
-<h1 id="labels">Labels</h1></div>
+<p>At any time during assemble, the statement <code>variable = value</code> can be used to change a assembly time variable into a different one.</p>
+<h1 id="labels">Labels</h1>
+<p>Labels are defined with <code>identifier:</code>. There are 3 types of labels in the code:
+* General labels, any label that isn't one of the others fall in this category.
+* Local labels, these start with a <code>.</code> and are expanded into a full label form of <code>previous_general_label.this_label</code>.
+* Non-scoped labels. These labels won't start a new local scope for local labels, and are useful for macros. These labels start with a double underscore: <code>__</code></p></div>
             </div>
         </div>
 

@@ -43,6 +43,9 @@
                             <li class="nav-item">
                                 <a href="../language/" class="nav-link">Language Reference</a>
                             </li>
+                            <li class="nav-item">
+                                <a href="../macros/" class="nav-link">Macros</a>
+                            </li>
                         </ul>
 
                     <ul class="nav navbar-nav ms-md-auto">
@@ -92,6 +95,10 @@
               <ul class="nav flex-column">
               </ul>
             </li>
+            <li class="nav-item" data-bs-level="2"><a href="#core-concepts" class="nav-link">Core concepts</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
               </ul>
             </li>
         </ul>
@@ -135,7 +142,30 @@ loop:
 }
 </code></pre>
 <p>To build the rom run the command <code>python3 [path-to-GB.HLA]/main.py main.asm --output rom.gb --symbols rom.sym</code> this will create your rom and the respective <code>.sym</code> file for debugging. It will also output how much space is free in the rom.</p>
-<p>You can now load this rom in any Emulator and run it. Nothing will happen, but there will also be no error. And if you enter the debugger, you will see the <code>entry</code> label.</p></div>
+<p>You can now load this rom in any Emulator and run it. Nothing will happen, but there will also be no error. And if you enter the debugger, you will see the <code>entry</code> label.</p>
+<h2 id="core-concepts">Core concepts</h2>
+<p>Unlike other assemblers, GB.HLA makes extensive use of scoping with <code>{}</code> characters, and allows indenting of everything. This allows you to build a more C like structure of your code. It allows nesting of sections and macros. This might sound confusing now, but it's extremely powerful to build a better structure of your code.</p>
+<p>Example:</p>
+<pre><code class="language-asm">#SECTION &quot;Main code&quot;, ROM0 {
+    call clearGraphics
+    #SECTION &quot;Graphics&quot;, ROMX {
+        graphicsData:
+            #INCGFX &quot;graphics.png&quot;
+    }
+    ld   hl, graphicsData ; This code directly follows the call to clearGraphics
+    ld   a,  BANK(graphicsData)
+    call loadGraphics
+    loop {  ; endless loop from &quot;gbz80/extra/loop.asm&quot;
+        ldh  a, [hInputButtons]
+        and  a
+        if   nz { ; if macro &quot;gbz80/extra/if.asm&quot;
+            call handleInput
+        } else {
+            call handleIdle
+        }
+    }
+}
+</code></pre></div>
             </div>
         </div>
 
