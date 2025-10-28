@@ -132,7 +132,7 @@ class Assembler:
                     pkey, pvalue = self._bracket_param(param)
                     bin_params[pkey.value] = [self._resolve_expr(None, param) for param in pvalue]
                 if bin_params:
-                    raise AssemblerException(file_token, f"Unknown option: {next(iter(bin_params.keys()))}")
+                    raise AssemblerException(start, f"Unknown option: {next(iter(bin_params.keys()))}")
                 with open(params[0][0].token.value, "rb") as f:
                     self.__section_stack[-1].data += f.read()
             elif start.isA('DIRECTIVE', '#INCGFX'):
