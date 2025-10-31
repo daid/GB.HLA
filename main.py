@@ -181,9 +181,13 @@ class Assembler:
                     value = self._resolve_to_number(condition)
                     allow = allow and (value != 0)
                 if allow:
-                    self.__block_macro_stack.append((None, None))  # HACKERDY HACK
+                    self.__block_macro_stack.append((None, None))  # Empty macro block to indicate we have an open true IF part
                 else:
                     self._get_raw_macro_block(start, tok)
+                    if tok.peek().isA('ID', 'ELSE'):
+                        tok.pop()
+                        tok.expect('{')
+                        self.__block_macro_stack.append((None, None))  # Empty macro block to indicate we have an open true IF part
             elif start.isA('DIRECTIVE', '#FOR'):
                 parameters = self._fetch_parameters(tok, params_end='{')
                 if len(parameters) != 3:
@@ -266,7 +270,13 @@ class Assembler:
             elif start.isA('}'):
                 if self.__block_macro_stack:
                     macro, macro_args = self.__block_macro_stack.pop()
-                    if macro is not None:
+                    if macro is None:
+                        # End of an IF block, check if there is an ELSE and skip that part.
+                        if tok.peek().isA('ID', 'ELSE'):
+                            tok.pop()
+                            tok.expect('{')
+                            self._get_raw_macro_block(start, tok)
+                    else:
                         macro_contents = macro.post_contents
                         if tok.peek().isA('ID') and tok.peek().value in macro.chains:
                             macro = macro.chains[tok.peek().value]
