@@ -277,6 +277,7 @@ class Assembler:
                             tok.expect('{')
                             self._get_raw_macro_block(start, tok)
                     else:
+                        # End of an macro block, check if we need to add "end of macro" or if we chain into another part of this macro.
                         macro_contents = macro.post_contents
                         if tok.peek().isA('ID') and tok.peek().value in macro.chains:
                             macro = macro.chains[tok.peek().value]
