@@ -4,7 +4,7 @@ from exception import AssemblerException
 from dataclasses import dataclass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Token:
     kind: str
     value: Any
