@@ -59,16 +59,14 @@ def parse_value(tok: Tokenizer) -> AstNode:
 
 def parse_anonymous_label(tok: Tokenizer) -> AstNode:
     t = tok.pop()
-    if tok.match('+'):
-        offset = 1
-        while tok.match('+'):
+    offset = 0
+    for c in t.value[1:]:
+        if c == '+':
             offset += 1
-    elif tok.match('-'):
-        offset = 0
-        while tok.match('-'):
+        elif c == '-':
             offset -= 1
-    else:
-        raise AssemblerException(t, f"Expect + or - after anonymous label")
+    if t.value[1] == '-':
+        offset += 1
     return AstNode("value", Token('ID', f"__anonymous_{g_anonymous_label_count + offset}", t.line_nr, t.filename), None, None)
 
 
@@ -115,7 +113,7 @@ def parse_binary(tok: Tokenizer) -> Tuple[str, AstNode]:
 
 EXPRESSION_RULES: Dict[str, Tuple[Callable[[Tokenizer], AstNode], Callable[[Tokenizer], Tuple[str, AstNode]], int]] = {
     'ID': (parse_value, None, PREC_NONE),
-    'LABEL': (parse_anonymous_label, None, PREC_NONE),
+    'ALABEL': (parse_anonymous_label, None, PREC_NONE),
     'STRING': (parse_value, None, PREC_NONE),
     'CURADDR': (parse_value, None, PREC_NONE),
     '#': (parse_unary, None, PREC_NONE),

@@ -267,7 +267,6 @@ class Assembler:
                     raise AssemblerException(start, "Trying to place label outside of section")
                 self.__labels[label] = (self.__section_stack[-1], len(self.__section_stack[-1].data))
             elif start.isA('LABEL'):  # anonymous label
-                tok.pop()
                 if not self.__section_stack:
                     raise AssemblerException(start, "Trying to place an anonymous label outside of section")
                 self.__anonymous_label_count += 1

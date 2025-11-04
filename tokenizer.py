@@ -40,6 +40,7 @@ class Tokenizer:
         ('BIN', r'%[0-1][0-1_]*'),
         ('GFX', r'`[0-3]+'),
         ('COMMENT', r';[^\n]*'),
+        ('ALABEL', r':[+-]+'),
         ('LABEL', r':'),
         ('DIRECTIVE', r'#[A-Za-z_]+'),
         ('STRING', '"[^"]*"'),
