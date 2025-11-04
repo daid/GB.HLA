@@ -39,3 +39,7 @@ class TestAssemblerBasics(unittest.TestCase):
         with self.assertRaises(AssemblerException) as context:
             self._simple('#ASSERT label != 0, "FAIL"\nlabel:')
         self.assertIn("FAIL", context.exception.message)
+    def test_anonymous_label(self):
+        self.assertEqual(self._simple("dw :+\n:\ndw :-"), b'\x02\x00\x02\x00')
+        self.assertEqual(self._simple(":\ndw :+\n:\ndw :-"), b'\x02\x00\x02\x00')
+        self.assertEqual(self._simple(":\ndw :++\n:\ndw :--\n:"), b'\x04\x00\x00\x00')

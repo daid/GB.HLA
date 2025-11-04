@@ -3,6 +3,8 @@ from exception import AssemblerException
 from typing import Tuple, Dict, Callable, List, Optional
 
 
+g_anonymous_label_count = 0
+
 PREC_NONE = 0
 PREC_ASSIGNMENT = 1  # =
 PREC_LOGIC_OR = 2  # or
@@ -55,6 +57,21 @@ def parse_value(tok: Tokenizer) -> AstNode:
     return AstNode("value", t, None, None)
 
 
+def parse_anonymous_label(tok: Tokenizer) -> AstNode:
+    t = tok.pop()
+    if tok.match('+'):
+        offset = 1
+        while tok.match('+'):
+            offset += 1
+    elif tok.match('-'):
+        offset = 0
+        while tok.match('-'):
+            offset -= 1
+    else:
+        raise AssemblerException(t, f"Expect + or - after anonymous label")
+    return AstNode("value", Token('ID', f"__anonymous_{g_anonymous_label_count + offset}", t.line_nr, t.filename), None, None)
+
+
 def parse_grouping(tok: Tokenizer) -> AstNode:
     tok.pop()
     res = parse_precedence(tok, PREC_ASSIGNMENT)
@@ -98,6 +115,7 @@ def parse_binary(tok: Tokenizer) -> Tuple[str, AstNode]:
 
 EXPRESSION_RULES: Dict[str, Tuple[Callable[[Tokenizer], AstNode], Callable[[Tokenizer], Tuple[str, AstNode]], int]] = {
     'ID': (parse_value, None, PREC_NONE),
+    'LABEL': (parse_anonymous_label, None, PREC_NONE),
     'STRING': (parse_value, None, PREC_NONE),
     'CURADDR': (parse_value, None, PREC_NONE),
     '#': (parse_unary, None, PREC_NONE),
@@ -145,7 +163,9 @@ def parse_precedence(tok: Tokenizer, precedence: int) -> AstNode:
     return a
 
 
-def parse_expression(tokens: List[Token]) -> AstNode:
+def parse_expression(tokens: List[Token], anonymous_label_count) -> AstNode:
+    global g_anonymous_label_count
+    g_anonymous_label_count = anonymous_label_count
     tok = Tokenizer()
     tok.prepend(tokens)
     result = parse_precedence(tok, PREC_ASSIGNMENT)

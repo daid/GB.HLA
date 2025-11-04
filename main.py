@@ -74,6 +74,7 @@ class Assembler:
         self.__func_db = MacroDB()
         self.__constants: Dict[str, int] = {}
         self.__labels: Dict[str, Tuple[Section, int]] = {}
+        self.__anonymous_label_count = 0
         self.__sections: List[Section] = []
         self.__current_scope: Optional[str] = None
         self.__include_paths = [os.path.dirname(__file__)]
@@ -265,6 +266,12 @@ class Assembler:
                 if not self.__section_stack:
                     raise AssemblerException(start, "Trying to place label outside of section")
                 self.__labels[label] = (self.__section_stack[-1], len(self.__section_stack[-1].data))
+            elif start.isA('LABEL'):  # anonymous label
+                tok.pop()
+                if not self.__section_stack:
+                    raise AssemblerException(start, "Trying to place an anonymous label outside of section")
+                self.__anonymous_label_count += 1
+                self.__labels[f"__anonymous_{self.__anonymous_label_count}"] = (self.__section_stack[-1], len(self.__section_stack[-1].data))
             elif start.isA('ID'):
                 self._process_statement(start, tok)
             elif start.isA('}'):
@@ -691,7 +698,7 @@ class Assembler:
                             contents = func(self, args)
                             tokens = tokens[:start_idx] + contents + tokens[end_idx + 1:]
                         else:
-                            return parse_expression(tokens)
+                            return parse_expression(tokens, self.__anonymous_label_count)
                         return self._process_expression(tokens)
                     elif t.isA(',') and brackets == 0:
                         args.append(arg)
@@ -705,7 +712,7 @@ class Assembler:
                 raise AssemblerException(start, f"Function not closed: {start.value}")
             if start.kind == 'ID' and start.value in self.__constants:
                 tokens[start_idx] = Token('NUMBER', self.__constants[start.value], start.line_nr, start.filename)
-        return parse_expression(tokens)
+        return parse_expression(tokens, self.__anonymous_label_count)
 
     def _resolve_expr(self, offset: Optional[int], expr: AstNode) -> Optional[AstNode]:
         if expr is None:
