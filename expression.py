@@ -36,6 +36,13 @@ class AstNode:
             return False
         return True
 
+    def is_string(self):
+        if self.kind != 'value':
+            return False
+        if self.token.kind != 'STRING':
+            return False
+        return True
+
     def __repr__(self):
         if self.kind == 'call':
             if self.right:

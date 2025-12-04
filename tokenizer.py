@@ -1,5 +1,5 @@
 import re
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union
 from exception import AssemblerException
 from dataclasses import dataclass
 
@@ -43,7 +43,7 @@ class Tokenizer:
         ('ALABEL', r':[+-]+'),
         ('LABEL', r':'),
         ('DIRECTIVE', r'#[A-Za-z_]+'),
-        ('STRING', '"[^"]*"'),
+        ('STRING', r'"(\\.|[^"\\])*"'),
         ('FUNC', r'\.?[A-Za-z_][A-Za-z0-9_\.]*\('),
         ('ID', r'\.?[A-Za-z_][A-Za-z0-9_\.]*'),
         ('CURADDR', r'@'),
@@ -54,7 +54,7 @@ class Tokenizer:
         ('MISMATCH', r'.'),
     ]))
 
-    def __init__(self, constants: Optional[Dict[str, int]] = None):
+    def __init__(self, constants: Optional[Dict[str, Union[int, str]]] = None):
         self.__tokens = []
         self.__eof = Token('EOF', '', 0, '')
         self.__constants = constants if constants is not None else {}
@@ -90,7 +90,7 @@ class Tokenizer:
             elif kind == 'OP':
                 kind = value
             elif kind == 'STRING':
-                value = value[1:-1]
+                value = value[1:-1].encode().decode("unicode-escape")
             elif kind == 'MISMATCH':
                 raise AssemblerException(Token(kind, value, line_nr, filename), "Syntax error")
             self.__tokens.append(Token(kind, value, line_nr, filename))

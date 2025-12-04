@@ -72,7 +72,7 @@ class Assembler:
     def __init__(self):
         self.__macro_db = MacroDB()
         self.__func_db = MacroDB()
-        self.__constants: Dict[str, int] = {}
+        self.__constants: Dict[str, Union[int, str]] = {}
         self.__labels: Dict[str, Tuple[Section, int]] = {}
         self.__anonymous_label_count = 0
         self.__sections: List[Section] = []
@@ -253,7 +253,7 @@ class Assembler:
                 params = self._fetch_parameters(tok)
                 if len(params) != 1:
                     raise AssemblerException(start, "Syntax error")
-                self.__constants[start.value] = self._resolve_to_number(params[0])
+                self.__constants[start.value] = self._resolve_to_number_or_string(params[0])
             elif start.isA('ID') and tok.peek().isA('LABEL'):
                 tok.pop()
                 label = start.value
@@ -710,7 +710,8 @@ class Assembler:
                         arg.append(tokens[end_idx])
                 raise AssemblerException(start, f"Function not closed: {start.value}")
             if start.kind == 'ID' and start.value in self.__constants:
-                tokens[start_idx] = Token('NUMBER', self.__constants[start.value], start.line_nr, start.filename)
+                value = self.__constants[start.value]
+                tokens[start_idx] = Token('STRING' if isinstance(value, str) else 'NUMBER', value, start.line_nr, start.filename)
         return parse_expression(tokens, self.__anonymous_label_count)
 
     def _resolve_expr(self, offset: Optional[int], expr: AstNode) -> Optional[AstNode]:
@@ -791,6 +792,12 @@ class Assembler:
     def _resolve_to_number(self, tokens: List[Token]) -> int:
         result = self._resolve_expr(None, self._process_expression(tokens))
         if not result.is_number():
+            raise AssemblerException(result.token, "Expected a constant integer expression")
+        return result.token.value
+
+    def _resolve_to_number_or_string(self, tokens: List[Token]) -> Union[int, str]:
+        result = self._resolve_expr(None, self._process_expression(tokens))
+        if not result.is_number() and not result.is_string():
             raise AssemblerException(result.token, "Expected a constant expression")
         return result.token.value
 
