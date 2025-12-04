@@ -23,3 +23,6 @@ class TestStringSupport(unittest.TestCase):
 
     def test_operators(self):
         self.assertEqual(self._simple('#IF "123" == "123" { \ndb 1\n }'), b'\x01')
+        self.assertEqual(self._simple('#IF "123" != "123" { \ndb 1\n }'), b'')
+        self.assertEqual(self._simple('#IF "123" != "456" { \ndb 1\n }'), b'\x01')
+        self.assertEqual(self._simple('#IF "123" == "456" { \ndb 1\n }'), b'')
