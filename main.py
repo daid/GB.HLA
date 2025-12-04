@@ -787,6 +787,18 @@ class Assembler:
                 expr.kind = 'value'
                 expr.left = None
                 expr.right = None
+            if expr.left and expr.left.is_string() and expr.right and expr.right.is_string():
+                if expr.kind == '+':
+                    expr.token = Token('STRING', expr.left.token.value + expr.right.token.value, expr.left.token.line_nr, expr.left.token.filename)
+                elif expr.kind == '==':
+                    expr.token = Token('NUMBER', 1 if expr.left.token.value == expr.right.token.value else 0, expr.left.token.line_nr, expr.left.token.filename)
+                elif expr.kind == '!=':
+                    expr.token = Token('NUMBER', 1 if expr.left.token.value != expr.right.token.value else 0, expr.left.token.line_nr, expr.left.token.filename)
+                else:
+                    return expr
+                expr.kind = 'value'
+                expr.left = None
+                expr.right = None
         return expr
 
     def _resolve_to_number(self, tokens: List[Token]) -> int:

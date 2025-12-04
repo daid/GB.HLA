@@ -20,3 +20,6 @@ class TestStringSupport(unittest.TestCase):
 
     def test_variable(self):
         self.assertEqual(self._simple('VAR = "123"\ndb VAR'), b'123')
+
+    def test_operators(self):
+        self.assertEqual(self._simple('#IF "123" == "123" { \ndb 1\n }'), b'\x01')
