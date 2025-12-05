@@ -43,3 +43,5 @@ class TestAssemblerBasics(unittest.TestCase):
         self.assertEqual(self._simple("dw :+\n:\ndw :-"), b'\x02\x00\x02\x00')
         self.assertEqual(self._simple(":\ndw :+\n:\ndw :-"), b'\x02\x00\x02\x00')
         self.assertEqual(self._simple(":\ndw :++\n:\ndw :--\n:"), b'\x04\x00\x00\x00')
+    def test_line_continuation(self):
+        self.assertEqual(self._simple("db $12, \\\n $34"), b'\x12\x34')

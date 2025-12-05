@@ -49,6 +49,7 @@ class Tokenizer:
         ('CURADDR', r'@'),
         ('OP', r'(?:<=)|(?:>=)|(?:==)|(?:!=)|(?:<<)|(?:>>)|[+\-*/,\(\)<>&|\[\]{}=]'),
         ('TOKENCONCAT', r'##'),
+        ('SKIPNEWLINE', r'\\\n'),
         ('NEWLINE', r'\n'),
         ('SKIP', r'[ \t]+'),
         ('MISMATCH', r'.'),
@@ -65,6 +66,9 @@ class Tokenizer:
             kind = m.lastgroup
             value = m.group()
             if kind == 'SKIP' or kind == 'COMMENT':
+                continue
+            if kind == 'SKIPNEWLINE':
+                line_nr += 1
                 continue
             if kind == 'NUMBER':
                 value = int(value)
