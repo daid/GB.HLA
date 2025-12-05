@@ -87,9 +87,16 @@ class Assembler:
         self.__linking_allocation_done = False
 
     def process_file(self, filename):
+        self.__section_stack = []
+        self.__block_macro_stack = []
+        self.__current_scope = None
+
         self.__include_paths.append(os.path.dirname(filename))
         self._process_file(filename)
         self.__include_paths.pop()
+
+        if self.__section_stack:
+            raise AssemblerException(start, f"End of file reached with section open")
 
     def _process_file(self, filename):
         print(f"Processing file: {filename}")
@@ -103,9 +110,6 @@ class Assembler:
         raise AssemblerException(filename, "Include not found")
 
     def process_code(self, code, *, filename="[string]"):
-        self.__section_stack = []
-        self.__block_macro_stack = []
-        self.__current_scope = None
         tok = Tokenizer(self.__constants)
         tok.add_code(code, filename=filename)
         while start := tok.pop():
@@ -134,7 +138,7 @@ class Assembler:
                     bin_params[pkey.value] = [self._resolve_expr(None, param) for param in pvalue]
                 if bin_params:
                     raise AssemblerException(start, f"Unknown option: {next(iter(bin_params.keys()))}")
-                with open(params[0][0].token.value, "rb") as f:
+                with open(params[0][0].value, "rb") as f:
                     self.__section_stack[-1].data += f.read()
             elif start.isA('DIRECTIVE', '#INCGFX'):
                 params = self._fetch_parameters(tok)
@@ -304,8 +308,6 @@ class Assembler:
                     raise AssemblerException(start, f"Unexpected }}")
             else:
                 raise AssemblerException(start, f"Syntax error")
-        if self.__section_stack:
-            raise AssemblerException(start, f"End of file reached with section open")
 
     def link(self, *, print_free_space=False):
         sa = SpaceAllocator(self.__layouts)
@@ -457,7 +459,7 @@ class Assembler:
         if len(params) < 1:
             raise AssemblerException(start, "Expected name of section layout")
         name, (start_addr, end_addr) = self._bracket_param(params[0], 2)
-        if name.value in self.__layouts:
+        if name.value.upper() in self.__layouts:
             raise AssemblerException(start, "Duplicate layout name")
         layout = Layout(name.value, start_addr.token.value, end_addr.token.value)
         for param in params[1:]:
@@ -476,7 +478,7 @@ class Assembler:
                 layout.banked = True
             else:
                 raise AssemblerException(pkey, "Unknown parameter to #LAYOUT")
-        self.__layouts[name.value] = layout
+        self.__layouts[name.value.upper()] = layout
 
     def _start_section(self, start: Token, tok: Tokenizer):
         params = self._fetch_parameters(tok, params_end='{')
@@ -494,15 +496,15 @@ class Assembler:
         address = -1
         if section_type_param:
             address = section_type_param[0].token.value
-        if section_type.value not in self.__layouts:
+        if section_type.value.upper() not in self.__layouts:
             raise AssemblerException(section_type, "Section type not found")
-        layout = self.__layouts[section_type.value]
+        layout = self.__layouts[section_type.value.upper()]
         if address > -1 and not (layout.start_addr <= address < layout.end_addr):
             raise AssemblerException(section_type, "Address out of range for section")
         section = Section(layout, name.token, address)
         for param in params[2:]:
             pkey, pvalue = self._bracket_param(param)
-            if pkey.value == 'BANK':
+            if pkey.value.upper() == 'BANK':
                 if len(pvalue) != 1:
                     raise AssemblerException(pkey, "BANK requires an argument")
                 if not layout.banked:
@@ -785,6 +787,8 @@ class Assembler:
                     expr.token = Token('NUMBER', 1 if expr.left.token.value == expr.right.token.value else 0, expr.left.token.line_nr, expr.left.token.filename)
                 elif expr.kind == '!=':
                     expr.token = Token('NUMBER', 1 if expr.left.token.value != expr.right.token.value else 0, expr.left.token.line_nr, expr.left.token.filename)
+                elif expr.kind == '!' and not expr.right:
+                    expr.token = Token('NUMBER', 0 if expr.left.token.value else 1, expr.left.token.line_nr, expr.left.token.filename)
                 else:
                     return expr
                 expr.kind = 'value'
