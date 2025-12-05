@@ -438,10 +438,13 @@ class Assembler:
             if len(section.data) in offset_to_label:
                 print(f"{offset_to_label[len(section.data)]}:")
     
-    def get_label(self, label: str) -> Tuple[Section, int]:
+    def get_label(self, label: str) -> Tuple[Section, Optional[int]]:
         if label in self.__labels:
             return self.__labels[label]
         return None, None
+    
+    def get_constant(self, name: str) -> Optional[Union[int, str]]:
+        return self.__constants.get(name)
     
     def get_sections(self, layout_name: str) -> List[Section]:
         return [section for section in self.__sections if section.layout.name == layout_name]

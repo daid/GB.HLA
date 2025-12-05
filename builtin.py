@@ -53,6 +53,17 @@ def bank(assembler, param: AstNode) -> AstNode:
     return AstNode('value', Token('NUMBER', bank, label_token.line_nr, label_token.filename), None, None)
 
 
+@builtin()
+def defined(assembler, args: List[List[Token]]) -> List[Token]:
+    if len(args) != 1:
+        raise AssemblerException(args[0][0], "strlen requires 1 argument")
+    if len(args[0]) != 1 or args[0][0].kind != "ID":
+        raise AssemblerException(args[0][0], "Expected an identifier")
+    st = args[0][0]
+    constant = assembler.get_constant(st.value)
+    return [Token("NUMBER", 0 if constant is None else 1, st.line_nr, st.filename)]
+
+
 @builtin(function_type="link")
 def bank_max(assembler, param: AstNode) -> AstNode:
     if param.right:

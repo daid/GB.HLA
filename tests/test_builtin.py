@@ -47,3 +47,7 @@ class TestAssemblerBuiltin(unittest.TestCase):
         self.assertEqual(len(s), 2)
         self.assertEqual(s[0].bank, 0)
         self.assertEqual(s[0].data, b'\x00\x01')
+
+    def test_defined(self):
+        self.assertEqual(self._simple('#IF DEFINED(x) { db 1\n } ELSE { db 2\n }'), b'\x02')
+        self.assertEqual(self._simple('x = 1\n#IF DEFINED(x) { db 1\n } ELSE { db 2\n }'), b'\x01')
