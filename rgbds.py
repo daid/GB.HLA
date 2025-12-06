@@ -65,6 +65,7 @@ class Section:
 class Patch:
     def __init__(self, obj_file):
         self.obj_file = obj_file
+        self.node = None
         self.line_no = -1
         self.offset = -1
         self.pc_section = -1
@@ -133,26 +134,26 @@ class Patch:
                     stack.append(AstNode(">", Token("OP", ">", self.line_no, "?"), left, right))
                 case 0x50:  # Bank
                     symbol = self.obj_file.symbols[struct.unpack("<I", self.rpn[idx + 1:idx + 5])[0]]
-                    symbol_node = AstNode("value", Token("ID", symbol.label, symbol.line_no, symbol.node.name), None, None)
+                    symbol_node = AstNode("value", Token("ID", symbol.label, self.line_no, "?"), None, None)
                     call_node = AstNode("call", Token("ID", "BANK", self.line_no, "?"), None, AstNode('param', symbol_node.token, symbol_node, None))
                     stack.append(call_node)
                     idx += 4
                 case 0x70:  # HIGH
                     left = stack.pop()
-                    stack.append(AstNode(">>", Token("OP", ">>", self.line_no, "?"), left, AstNode("value", Token("NUMBER", 8, self.line_no, "?"), None, None)))
+                    stack.append(AstNode(">>", Token("OP", ">>", self.line_no, "?"), left, AstNode("value", Token("NUMBER", 8, self.line_no, self.node.name), None, None)))
                 case 0x71:  # LOW
                     left = stack.pop()
-                    stack.append(AstNode("&", Token("OP", "&", self.line_no, "?"), left, AstNode("value", Token("NUMBER", 0xFF, self.line_no, "?"), None, None)))
+                    stack.append(AstNode("&", Token("OP", "&", self.line_no, "?"), left, AstNode("value", Token("NUMBER", 0xFF, self.line_no, self.node.name), None, None)))
                 case 0x80:  # Value
                     value = struct.unpack("<I", self.rpn[idx+1:idx+5])[0]
                     stack.append(AstNode("value", Token("NUMBER", value, self.line_no, "?"), None, None))
                     idx += 4
                 case 0x81:  # Symbol
                     symbol = self.obj_file.symbols[struct.unpack("<I", self.rpn[idx+1:idx+5])[0]]
-                    if symbol.section_id == -1:  # just a constant
-                        stack.append(AstNode("value", Token("NUMBER", symbol.value, symbol.line_no, symbol.node.name), None, None))
+                    if symbol.section_id == -1 and symbol.type != 1:  # just a constant
+                        stack.append(AstNode("value", Token("NUMBER", symbol.value, self.line_no, self.node.name), None, None))
                     else:
-                        stack.append(AstNode("value", Token("ID", symbol.label, symbol.line_no, symbol.node.name), None, None))
+                        stack.append(AstNode("value", Token("ID", symbol.label, self.line_no, self.node.name), None, None))
                     idx += 4
                 case _:
                     raise NotImplementedError(f"RPN: {self.rpn[idx]:02x} {stack}")
@@ -212,6 +213,7 @@ class ObjectFile:
                     patch = Patch(self)
                     node_id, patch.line_no, patch.offset, patch.pc_section, patch.pc_offset, patch.patch_type, rpn_size = struct.unpack("<iiiiiBi", f.read(25))
                     assert patch.pc_section == idx, "LOAD blocks not supported"
+                    patch.node = self.nodes[node_id]
                     patch.rpn = f.read(rpn_size)
                     section.patches.append(patch)
             self.sections.append(section)
