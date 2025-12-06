@@ -85,8 +85,11 @@ class Assembler:
         self.__block_macro_stack: List[Tuple[Macro, Dict[str, List[Token]]]] = []
         self.__user_stack: Dict[str, List[int]] = {}
         self.__linking_allocation_done = False
+    
+    def add_include_path(self, path: str) -> None:
+        self.__include_paths.append(path)
 
-    def process_file(self, filename):
+    def process_file(self, filename) -> None:
         self.__section_stack = []
         self.__block_macro_stack = []
         self.__current_scope = None
@@ -102,12 +105,15 @@ class Assembler:
         print(f"Processing file: {filename}")
         self.process_code(open(filename, "rt").read(), filename=filename)
 
-    def _include_file(self, filename: Token):
+    def _find_file_in_include_paths(self, filename: Token) -> str:
         for path in self.__include_paths:
             full_path = os.path.join(path, filename.value)
             if os.path.exists(full_path):
-                return self._process_file(full_path)
-        raise AssemblerException(filename, "Include not found")
+                return full_path
+        raise AssemblerException(filename, f"File not found: {filename.value}")
+
+    def _include_file(self, filename: Token):
+        return self._process_file(self._find_file_in_include_paths(filename))
 
     def process_code(self, code, *, filename="[string]"):
         tok = Tokenizer(self.__constants)
@@ -138,7 +144,7 @@ class Assembler:
                     bin_params[pkey.value] = [self._resolve_expr(None, param) for param in pvalue]
                 if bin_params:
                     raise AssemblerException(start, f"Unknown option: {next(iter(bin_params.keys()))}")
-                with open(params[0][0].value, "rb") as f:
+                with open(self._find_file_in_include_paths(params[0][0]), "rb") as f:
                     self.__section_stack[-1].data += f.read()
             elif start.isA('DIRECTIVE', '#INCGFX'):
                 params = self._fetch_parameters(tok)
@@ -827,12 +833,15 @@ def main():
     parser.add_argument("input")
     parser.add_argument("--output")
     parser.add_argument("--symbols")
+    parser.add_argument("--include-path", "-I", action='append')
     parser.add_argument("--dump", action="store_true")
 
     args = parser.parse_args()
 
     try:
         a = Assembler()
+        for path in args.include_path:
+            a.add_include_path(path)
         a.process_file(args.input)
         a.link(print_free_space=True)
     except AssemblerException as e:
