@@ -99,7 +99,7 @@ class Assembler:
         self.__include_paths.pop()
 
         if self.__section_stack:
-            raise AssemblerException(start, f"End of file reached with section open")
+            raise AssemblerException(Token('EOF', '', 1, filename), f"End of file reached with section open")
 
     def _process_file(self, filename):
         print(f"Processing file: {filename}")
@@ -157,6 +157,11 @@ class Assembler:
                     pkey, pvalue = self._bracket_param(param)
                     gfx_params[pkey.value] = [self._resolve_expr(None, param) for param in pvalue]
                 self.__section_stack[-1].data += gfx.read(params[0][0], gfx_params)
+            elif start.isA('DIRECTIVE', '#INCRGBDS'):
+                params = self._fetch_parameters(tok)
+                if len(params) != 1 or len(params[0]) != 1 or params[0][0].kind != 'STRING':
+                    raise AssemblerException(start, "Syntax error")
+                self._add_rgbds_object(params[0][0])
             elif start.isA('DIRECTIVE', '#LAYOUT'):
                 self._define_layout(start, tok)
             elif start.isA('DIRECTIVE', '#SECTION'):
@@ -826,6 +831,34 @@ class Assembler:
             raise AssemblerException(result.token, "Expected a constant expression")
         return result.token.value
 
+    def _add_rgbds_object(self, filename: Token) -> None:
+        import rgbds
+        object_file = rgbds.ObjectFile(filename.value)
+        sections = []
+        for section in object_file.sections:
+            layout = self.__layouts.get(section.get_layout_name())
+            for s in self.__sections:
+                if s.name == section.name:
+                    raise AssemblerException(section.get_name_token(), "Duplicate section name")
+            s = Section(layout, section.get_name_token(), section.address, section.bank if layout.banked else None)
+            if section.data:
+                s.data = bytearray(section.data)
+            else:
+                s.data = bytearray(section.size)
+            for patch in section.patches:
+                s.link[patch.offset] = (patch.get_link_type(), patch.get_ast())
+            self.__sections.append(s)
+            sections.append(s)
+        for symbol in object_file.symbols:
+            if symbol.type == 1:
+                continue
+            if symbol.section_id != -1:
+                if symbol.label in self.__labels:
+                    raise AssemblerException(symbol.get_label_token(), "Duplicate label")
+                self.__labels[symbol.label] = (sections[symbol.section_id], symbol.value)
+            # else:
+            #     self.__constants[symbol.label] = symbol.value
+
 
 def main():
     import argparse
@@ -840,8 +873,9 @@ def main():
 
     try:
         a = Assembler()
-        for path in args.include_path:
-            a.add_include_path(path)
+        if args.include_path:
+            for path in args.include_path:
+                a.add_include_path(path)
         a.process_file(args.input)
         a.link(print_free_space=True)
     except AssemblerException as e:
