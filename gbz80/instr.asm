@@ -42,7 +42,7 @@
 #MACRO and a, e { db $a3 }
 #MACRO and a, h { db $a4 }
 #MACRO and a, l { db $a5 }
-#MACRO bit _id, [hl] { db $cb, $46 | ((_idx) << 3) }
+#MACRO bit _idx, [hl] { db $cb, $46 | ((_idx) << 3) }
 #MACRO bit _idx, a { db $cb, $47 | ((_idx) << 3) }
 #MACRO bit _idx, b { db $cb, $40 | ((_idx) << 3) }
 #MACRO bit _idx, c { db $cb, $41 | ((_idx) << 3) }

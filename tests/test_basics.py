@@ -27,6 +27,8 @@ class TestAssemblerBasics(unittest.TestCase):
         self.assertEqual(self._simple("VALUE = $1 + 3\ndb VALUE"), b'\x04')
     def test_var2(self):
         self.assertEqual(self._simple("VALUE = $1 + 3\ndb VALUE\nVALUE = 3 * 3\ndb VALUE"), b'\x04\x09')
+    def test_var3(self):
+        self.assertEqual(self._simple("VALUE = 2\ndb label | VALUE\nlabel:"), b'\x03')
     def test_assert(self):
         with self.assertRaises(AssemblerException) as context:
             self._simple('#ASSERT 0')

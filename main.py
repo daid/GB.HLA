@@ -338,6 +338,7 @@ class Assembler:
                 section.base_address = addr
         self.__linking_allocation_done = True
         for section in self.__sections:
+            self.linking_section = section
             for offset, expr, message in section.asserts:
                 try:
                     expr = self._resolve_expr(section.base_address + offset, expr)
@@ -365,11 +366,11 @@ class Assembler:
                         continue
                     if link_size == 1:
                         if expr.token.value < -128 or expr.token.value > 255:
-                            raise AssemblerException(expr.token, f"Value out of range")
+                            raise AssemblerException(expr.token, f"Value ({expr.token.value}) out of range for 8 bit value")
                         section.data[offset] = expr.token.value & 0xFF
                     elif link_size == 2:
                         if expr.token.value < 0 or expr.token.value > 0xFFFF:
-                            raise AssemblerException(expr.token, f"Value out of range")
+                            raise AssemblerException(expr.token, f"Value ({expr.token.value} out of range for 16 bit value")
                         section.data[offset] = expr.token.value & 0xFF
                         section.data[offset+1] = expr.token.value >> 8
                     else:
@@ -788,10 +789,14 @@ class Assembler:
                     expr.token = Token('NUMBER', expr.left.token.value * expr.right.token.value, expr.left.token.line_nr, expr.left.token.filename)
                 elif expr.kind == '/':
                     expr.token = Token('NUMBER', expr.left.token.value // expr.right.token.value, expr.left.token.line_nr, expr.left.token.filename)
+                elif expr.kind == '%':
+                    expr.token = Token('NUMBER', expr.left.token.value % expr.right.token.value, expr.left.token.line_nr, expr.left.token.filename)
                 elif expr.kind == '&':
                     expr.token = Token('NUMBER', expr.left.token.value & expr.right.token.value, expr.left.token.line_nr, expr.left.token.filename)
                 elif expr.kind == '|':
                     expr.token = Token('NUMBER', expr.left.token.value | expr.right.token.value, expr.left.token.line_nr, expr.left.token.filename)
+                elif expr.kind == '^':
+                    expr.token = Token('NUMBER', expr.left.token.value ^ expr.right.token.value, expr.left.token.line_nr, expr.left.token.filename)
                 elif expr.kind == '>>':
                     expr.token = Token('NUMBER', expr.left.token.value >> expr.right.token.value, expr.left.token.line_nr, expr.left.token.filename)
                 elif expr.kind == '<<':
@@ -808,8 +813,15 @@ class Assembler:
                     expr.token = Token('NUMBER', 1 if expr.left.token.value == expr.right.token.value else 0, expr.left.token.line_nr, expr.left.token.filename)
                 elif expr.kind == '!=':
                     expr.token = Token('NUMBER', 1 if expr.left.token.value != expr.right.token.value else 0, expr.left.token.line_nr, expr.left.token.filename)
+                elif expr.kind == '&&':
+                    expr.token = Token('NUMBER', 1 if expr.left.token.value and expr.right.token.value else 0, expr.left.token.line_nr, expr.left.token.filename)
+                elif expr.kind == '||':
+                    expr.token = Token('NUMBER', 1 if expr.left.token.value or expr.right.token.value else 0, expr.left.token.line_nr, expr.left.token.filename)
                 elif expr.kind == '!' and not expr.right:
                     expr.token = Token('NUMBER', 0 if expr.left.token.value else 1, expr.left.token.line_nr, expr.left.token.filename)
+                elif expr.kind == '~' and not expr.right:
+                    # TODO, this clamps to 8 bit.
+                    expr.token = Token('NUMBER', (~expr.left.token.value) & 0xFF, expr.left.token.line_nr, expr.left.token.filename)
                 else:
                     return expr
                 expr.kind = 'value'

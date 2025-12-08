@@ -42,11 +42,11 @@ def bank(assembler, param: AstNode) -> AstNode:
         raise AssemblerException(param.token, "bank requires 1 argument")
     label_token = param.left.token
     if label_token.kind == "CURADDR":
-        raise AssemblerException(param.token, "BANK(@) not yet implemented")
-    if label_token.kind != "ID":
+        section = assembler.linking_section
+    elif label_token.kind != "ID":
         raise AssemblerException(param.token, "Expected a label to BANK()")
-
-    section, section_offset = assembler.get_label(label_token.value)
+    else:
+        section, _ = assembler.get_label(label_token.value)
     if not section:
         raise AssemblerException(param.token, f"Could not find label {label_token.value} for BANK()")
     if section.base_address < 0:

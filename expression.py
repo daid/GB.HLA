@@ -9,13 +9,13 @@ PREC_NONE = 0
 PREC_ASSIGNMENT = 1  # =
 PREC_LOGIC_OR = 2  # or
 PREC_LOGIC_AND = 3  # and
-PREC_BITWISE_OR = 4  # |
-PREC_BITWISE_XOR = 5  # ^
-PREC_BITWISE_AND = 6  # &
-PREC_EQUALITY = 7  # == !=
-PREC_COMPARISON = 8  # < > <= >=
-PREC_SHIFT = 9  # << >>
-PREC_TERM = 10  # + -
+PREC_EQUALITY = 4  # == !=
+PREC_COMPARISON = 5  # < > <= >=
+PREC_TERM = 6  # + -
+PREC_BITWISE_OR = 7  # |
+PREC_BITWISE_XOR = 8  # ^
+PREC_BITWISE_AND = 9  # &
+PREC_SHIFT = 10  # << >>
 PREC_FACTOR = 11  # * /
 PREC_UNARY = 12  # ! -
 PREC_CALL = 13  # . () []
