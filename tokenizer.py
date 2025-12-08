@@ -47,7 +47,7 @@ class Tokenizer:
         ('FUNC', r'\.?[A-Za-z_][A-Za-z0-9_\.]*\('),
         ('ID', r'\.?[A-Za-z_][A-Za-z0-9_\.]*'),
         ('CURADDR', r'@'),
-        ('OP', r'(?:<=)|(?:>=)|(?:==)|(?:!=)|(?:<<)|(?:>>)|[+\-*/,\(\)<>&|\[\]{}=!~\^\%]'),
+        ('OP', r'(?:<=)|(?:>=)|(?:==)|(?:!=)|(?:<<)|(?:>>)|(?:&&)|(?:\|\|)|[+\-*/,\(\)<>&|\[\]{}=!~\^\%]'),
         ('TOKENCONCAT', r'##'),
         ('SKIPNEWLINE', r'\\\n'),
         ('NEWLINE', r'\n'),
@@ -76,13 +76,13 @@ class Tokenizer:
                 try:
                     value = int(str(value)[1:], 16)
                 except ValueError:
-                    raise AssemblerException(Token(kind, value, line_nr, filename), "Syntax error")
+                    raise AssemblerException(Token(kind, value, line_nr, filename), "Syntax error: could not parse hex number")
                 kind = 'NUMBER'
             elif kind == 'BIN':
                 try:
                     value = int(str(value)[1:], 2)
                 except ValueError:
-                    raise AssemblerException(Token(kind, value, line_nr, filename), "Syntax error")
+                    raise AssemblerException(Token(kind, value, line_nr, filename), "Syntax error: could not parse binary number")
                 kind = 'NUMBER'
             elif kind == 'GFX':
                 value = int(str(value)[1:], 4)
@@ -96,7 +96,7 @@ class Tokenizer:
             elif kind == 'STRING':
                 value = value[1:-1].encode().decode("unicode-escape")
             elif kind == 'MISMATCH':
-                raise AssemblerException(Token(kind, value, line_nr, filename), "Syntax error")
+                raise AssemblerException(Token(kind, value, line_nr, filename), "Syntax error: invalid symbol")
             self.__tokens.append(Token(kind, value, line_nr, filename))
             if kind == 'NEWLINE':
                 line_nr += 1

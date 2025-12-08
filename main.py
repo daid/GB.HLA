@@ -318,7 +318,7 @@ class Assembler:
                 else:
                     raise AssemblerException(start, f"Unexpected }}")
             else:
-                raise AssemblerException(start, f"Syntax error")
+                raise AssemblerException(start, f"Syntax error: unexpected {start.kind}")
 
     def link(self, *, print_free_space=False):
         sa = SpaceAllocator(self.__layouts)

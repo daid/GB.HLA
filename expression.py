@@ -154,10 +154,10 @@ EXPRESSION_RULES: Dict[str, Tuple[Callable[[Tokenizer], AstNode], Callable[[Toke
 def parse_precedence(tok: Tokenizer, precedence: int) -> AstNode:
     token = tok.peek()
     if token.kind not in EXPRESSION_RULES:
-        raise AssemblerException(token, f"Unexpected {token.value}")
+        raise AssemblerException(token, f"Unexpected: {token.value} ({token.kind})")
     prefix_rule = EXPRESSION_RULES[token.kind][0]
     if prefix_rule is None:
-        raise AssemblerException(token, "Expect expression.")
+        raise AssemblerException(token, f"Expect expression, but got: {token.kind}")
     a = prefix_rule(tok)
 
     while tok.peek().kind in EXPRESSION_RULES and precedence <= EXPRESSION_RULES[tok.peek().kind][2]:
