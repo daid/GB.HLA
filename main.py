@@ -707,11 +707,14 @@ class Assembler:
         return tokens[0], params
 
     def _process_expression(self, tokens: List[Token]) -> AstNode:
-        for start_idx, start in enumerate(tokens):
+        start_idx = 0
+        while start_idx < len(tokens):
+            start = tokens[start_idx]
             if start.kind == 'FUNC':
                 args = []
                 arg = []
                 brackets = 0
+                next_start_idx = None
                 for end_idx in range(start_idx + 1, len(tokens)):
                     t = tokens[end_idx]
                     if t.isA(')') and brackets == 0:
@@ -723,9 +726,11 @@ class Assembler:
                         if func.function_type == "macro":
                             contents = func(self, args)
                             tokens = tokens[:start_idx] + contents + tokens[end_idx + 1:]
+                            next_start_idx = start_idx + len(contents)
+                            break
                         else:
-                            return parse_expression(tokens, self.__anonymous_label_count)
-                        return self._process_expression(tokens)
+                            next_start_idx = end_idx
+                            break
                     elif t.isA(',') and brackets == 0:
                         args.append(arg)
                         arg = []
@@ -735,10 +740,15 @@ class Assembler:
                         elif t.kind == ')':
                             brackets -= 1
                         arg.append(tokens[end_idx])
-                raise AssemblerException(start, f"Function not closed: {start.value}")
-            if start.kind == 'ID' and start.value in self.__constants:
+                if next_start_idx is None:
+                    raise AssemblerException(start, f"Function not closed: {start.value}")
+                start_idx = next_start_idx
+            elif start.kind == 'ID' and start.value in self.__constants:
                 value = self.__constants[start.value]
                 tokens[start_idx] = Token('STRING' if isinstance(value, str) else 'NUMBER', value, start.line_nr, start.filename)
+                start_idx += 1
+            else:
+                start_idx += 1
         return parse_expression(tokens, self.__anonymous_label_count)
 
     def _resolve_expr(self, offset: Optional[int], expr: AstNode) -> Optional[AstNode]:
