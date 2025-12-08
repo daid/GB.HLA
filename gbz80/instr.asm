@@ -130,6 +130,7 @@
     dw _target }
 #MACRO ld [bc], a { db $02 }
 #MACRO ldh [c], a { db $e2 }
+#MACRO ldh [$FF00+c], a { db $e2 }
 #MACRO ld [de], a { db $12 }
 #MACRO ld [hl], _value { db $36, _value }
 #MACRO ld [hl+], a { db $22 }
@@ -145,6 +146,7 @@
     dw _target }
 #MACRO ld a, [bc] { db $0a }
 #MACRO ldh a, [c] { db $f2 }
+#MACRO ldh a, [$FF00+c] { db $f2 }
 #MACRO ld a, [de] { db $1a }
 #MACRO ld a, [hl+] { db $2a }
 #MACRO ld a, [hl-] { db $3a }

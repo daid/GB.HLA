@@ -321,6 +321,8 @@ class Assembler:
                 raise AssemblerException(start, f"Syntax error: unexpected {start.kind}")
 
     def link(self, *, print_free_space=False):
+        link_exception = None
+
         sa = SpaceAllocator(self.__layouts)
         for section in self.__sections:
             if section.base_address > -1:
@@ -352,9 +354,15 @@ class Assembler:
                     self.__post_build_link.append((section, offset, link_size, expr))
                 else:
                     if expr.kind != 'value':
-                        raise AssemblerException.from_expression(expr, f"Failed to parse linking '{expr}', symbol not found?")
+                        print(f"Failed to parse linking '{expr}', symbol not found?")
+                        if not link_exception:
+                            link_exception = AssemblerException.from_expression(expr, f"Failed to parse linking '{expr}', symbol not found?")
+                        continue
                     if not expr.token.isA('NUMBER'):
-                        raise AssemblerException.from_expression(expr, f"Failed to link '{expr}', symbol not found?")
+                        print(f"Failed to link '{expr}', symbol not found?")
+                        if not link_exception:
+                            link_exception = AssemblerException.from_expression(expr, f"Failed to link '{expr}', symbol not found?")
+                        continue
                     if link_size == 1:
                         if expr.token.value < -128 or expr.token.value > 255:
                             raise AssemblerException(expr.token, f"Value out of range")
@@ -366,6 +374,8 @@ class Assembler:
                         section.data[offset+1] = expr.token.value >> 8
                     else:
                         raise NotImplementedError()
+        if link_exception:
+            raise link_exception
         if print_free_space:
             sa.dump_free_space()
         return self.__sections
