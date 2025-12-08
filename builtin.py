@@ -41,6 +41,8 @@ def bank(assembler, param: AstNode) -> AstNode:
     if param.right:
         raise AssemblerException(param.token, "bank requires 1 argument")
     label_token = param.left.token
+    if label_token.kind == "CURADDR":
+        raise AssemblerException(param.token, "BANK(@) not yet implemented")
     if label_token.kind != "ID":
         raise AssemblerException(param.token, "Expected a label to BANK()")
 
