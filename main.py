@@ -53,7 +53,9 @@ class Section:
 
     def add8(self, node: AstNode) -> None:
         if node.kind == 'value' and node.token.kind == 'NUMBER':
-            self.data.append(node.token.value)
+            if node.token.value < -128 or node.token.value > 255:
+                raise AssemblerException(node.token, f"value out of range for 8bit value ({node.token.value})")
+            self.data.append(node.token.value & 0xFF)
         elif node.kind == 'value' and node.token.kind == 'STRING':
             self.data += node.token.value.encode("ASCII")
         else:

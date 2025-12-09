@@ -88,65 +88,65 @@ class Patch:
                 case 0x00:  # +
                     right = stack.pop()
                     left = stack.pop()
-                    stack.append(AstNode("+", Token("OP", "+", self.line_no, "?"), left, right))
+                    stack.append(AstNode("+", Token("OP", "+", self.line_no, self.node.name), left, right))
                 case 0x01:  # -
                     right = stack.pop()
                     left = stack.pop()
-                    stack.append(AstNode("-", Token("OP", "-", self.line_no, "?"), left, right))
+                    stack.append(AstNode("-", Token("OP", "-", self.line_no, self.node.name), left, right))
                 case 0x02:  # *
                     right = stack.pop()
                     left = stack.pop()
-                    stack.append(AstNode("*", Token("OP", "*", self.line_no, "?"), left, right))
+                    stack.append(AstNode("*", Token("OP", "*", self.line_no, self.node.name), left, right))
                 case 0x03:  # /
                     right = stack.pop()
                     left = stack.pop()
-                    stack.append(AstNode("/", Token("OP", "/", self.line_no, "?"), left, right))
+                    stack.append(AstNode("/", Token("OP", "/", self.line_no, self.node.name), left, right))
                 case 0x10:  # |
                     right = stack.pop()
                     left = stack.pop()
-                    stack.append(AstNode("|", Token("OP", "|", self.line_no, "?"), left, right))
+                    stack.append(AstNode("|", Token("OP", "|", self.line_no, self.node.name), left, right))
                 case 0x11:  # &
                     right = stack.pop()
                     left = stack.pop()
-                    stack.append(AstNode("&", Token("OP", "&", self.line_no, "?"), left, right))
+                    stack.append(AstNode("&", Token("OP", "&", self.line_no, self.node.name), left, right))
                 case 0x12:  # ^
                     right = stack.pop()
                     left = stack.pop()
-                    stack.append(AstNode("^", Token("OP", "^", self.line_no, "?"), left, right))
+                    stack.append(AstNode("^", Token("OP", "^", self.line_no, self.node.name), left, right))
                 case 0x12:  # ~
                     left = stack.pop()
-                    stack.append(AstNode("~", Token("OP", "~", self.line_no, "?"), left, None))
+                    stack.append(AstNode("~", Token("OP", "~", self.line_no, self.node.name), left, None))
                 case 0x30:  # ==
                     right = stack.pop()
                     left = stack.pop()
-                    stack.append(AstNode("==", Token("OP", "==", self.line_no, "?"), left, right))
+                    stack.append(AstNode("==", Token("OP", "==", self.line_no, self.node.name), left, right))
                 case 0x31:  # ==
                     right = stack.pop()
                     left = stack.pop()
-                    stack.append(AstNode("!=", Token("OP", "!=", self.line_no, "?"), left, right))
+                    stack.append(AstNode("!=", Token("OP", "!=", self.line_no, self.node.name), left, right))
                 case 0x32:  # <
                     right = stack.pop()
                     left = stack.pop()
-                    stack.append(AstNode("<", Token("OP", "<", self.line_no, "?"), left, right))
+                    stack.append(AstNode("<", Token("OP", "<", self.line_no, self.node.name), left, right))
                 case 0x33:  # >
                     right = stack.pop()
                     left = stack.pop()
-                    stack.append(AstNode(">", Token("OP", ">", self.line_no, "?"), left, right))
+                    stack.append(AstNode(">", Token("OP", ">", self.line_no, self.node.name), left, right))
                 case 0x50:  # Bank
                     symbol = self.obj_file.symbols[struct.unpack("<I", self.rpn[idx + 1:idx + 5])[0]]
-                    symbol_node = AstNode("value", Token("ID", symbol.label, self.line_no, "?"), None, None)
-                    call_node = AstNode("call", Token("ID", "BANK", self.line_no, "?"), None, AstNode('param', symbol_node.token, symbol_node, None))
+                    symbol_node = AstNode("value", Token("ID", symbol.label, self.line_no, self.node.name), None, None)
+                    call_node = AstNode("call", Token("ID", "BANK", self.line_no, self.node.name), None, AstNode('param', symbol_node.token, symbol_node, None))
                     stack.append(call_node)
                     idx += 4
                 case 0x70:  # HIGH
                     left = stack.pop()
-                    stack.append(AstNode(">>", Token("OP", ">>", self.line_no, "?"), left, AstNode("value", Token("NUMBER", 8, self.line_no, self.node.name), None, None)))
+                    stack.append(AstNode(">>", Token("OP", ">>", self.line_no, self.node.name), left, AstNode("value", Token("NUMBER", 8, self.line_no, self.node.name), None, None)))
                 case 0x71:  # LOW
                     left = stack.pop()
-                    stack.append(AstNode("&", Token("OP", "&", self.line_no, "?"), left, AstNode("value", Token("NUMBER", 0xFF, self.line_no, self.node.name), None, None)))
+                    stack.append(AstNode("&", Token("OP", "&", self.line_no, self.node.name), left, AstNode("value", Token("NUMBER", 0xFF, self.line_no, self.node.name), None, None)))
                 case 0x80:  # Value
                     value = struct.unpack("<I", self.rpn[idx+1:idx+5])[0]
-                    stack.append(AstNode("value", Token("NUMBER", value, self.line_no, "?"), None, None))
+                    stack.append(AstNode("value", Token("NUMBER", value, self.line_no, self.node.name), None, None))
                     idx += 4
                 case 0x81:  # Symbol
                     symbol = self.obj_file.symbols[struct.unpack("<I", self.rpn[idx+1:idx+5])[0]]
@@ -160,8 +160,8 @@ class Patch:
             idx += 1
         assert len(stack) == 1
         if self.patch_type == 3:  # jr patch
-            stack[0] = AstNode("-", Token("OP", "-", self.line_no, "?"), stack[0], AstNode("value", Token("CURADDR", "@", self.line_no, "?"), None, None))
-            stack[0] = AstNode("-", Token("OP", "-", self.line_no, "?"), stack[0], AstNode("value", Token("NUMBER", 1, self.line_no, "?"), None, None))
+            stack[0] = AstNode("-", Token("OP", "-", self.line_no, self.node.name), stack[0], AstNode("value", Token("CURADDR", "@", self.line_no, self.node.name), None, None))
+            stack[0] = AstNode("-", Token("OP", "-", self.line_no, self.node.name), stack[0], AstNode("value", Token("NUMBER", 1, self.line_no, self.node.name), None, None))
         return stack[0]
 
 
