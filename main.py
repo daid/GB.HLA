@@ -907,7 +907,7 @@ class Assembler:
             layout = self.__layouts.get(area.get_layout_name())
             for s in self.__sections:
                 if s.name == area.name:
-                    raise AssemblerException(section.get_name_token(), "Duplicate section name")
+                    raise AssemblerException(area.get_name_token(), "Duplicate section name")
             s = Section(layout, area.get_name_token(), area.address, area.get_bank() if layout.banked else None)
             s.data = area.data
             self.__labels[f"__area_start_{area.name}"] = (s, 0)
