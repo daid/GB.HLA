@@ -164,6 +164,11 @@ class Assembler:
                 if len(params) != 1 or len(params[0]) != 1 or params[0][0].kind != 'STRING':
                     raise AssemblerException(start, "Syntax error")
                 self._add_rgbds_object(params[0][0])
+            elif start.isA('DIRECTIVE', '#INCSDCC'):
+                params = self._fetch_parameters(tok)
+                if len(params) != 1 or len(params[0]) != 1 or params[0][0].kind != 'STRING':
+                    raise AssemblerException(start, "Syntax error")
+                self._add_sdcc_object(params[0][0])
             elif start.isA('DIRECTIVE', '#LAYOUT'):
                 self._define_layout(start, tok)
             elif start.isA('DIRECTIVE', '#SECTION'):
@@ -893,6 +898,25 @@ class Assembler:
             # else:
             #     self.__constants[symbol.label] = symbol.value
 
+    def _add_sdcc_object(self, filename: Token) -> None:
+        import sdcc
+        object_file = sdcc.ObjectFile(filename.value)
+        for area in object_file.areas:
+            if area.size == 0:
+                continue
+            layout = self.__layouts.get(area.get_layout_name())
+            for s in self.__sections:
+                if s.name == area.name:
+                    raise AssemblerException(section.get_name_token(), "Duplicate section name")
+            s = Section(layout, area.get_name_token(), area.address, area.get_bank() if layout.banked else None)
+            s.data = area.data
+            self.__labels[f"__area_start_{area.name}"] = (s, 0)
+            for symbol in area.symbols:
+                assert symbol.is_label
+                self.__labels[symbol.name] = (s, symbol.offset)
+            for patch in area.patches:
+                s.link[patch.offset] = (patch.get_link_type(), patch.get_ast())
+            self.__sections.append(s)
 
 def main():
     import argparse

@@ -56,7 +56,7 @@ class Section:
             case 5: return "WRAMX"
             case 6: return "SRAM"
             case 7: return "OAM"
-        raise NotImplementedError("Section type: {self.type:02x}")
+        raise NotImplementedError(f"Section type: {self.type:02x}")
 
     def get_name_token(self) -> Token:
         return Token('STRING', self.name, self.line_no, self.node.name)
