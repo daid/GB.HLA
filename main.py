@@ -886,6 +886,8 @@ class Assembler:
                 s.data = bytearray(section.size)
             for patch in section.patches:
                 s.link[patch.offset] = (patch.get_link_type(), patch.get_ast())
+                if patch.patch_type == 3:  # jr target
+                    s.asserts.append((patch.offset, patch.get_assert_ast(), "JR out of range"))
             self.__sections.append(s)
             sections.append(s)
         for symbol in object_file.symbols:

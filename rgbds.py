@@ -164,6 +164,12 @@ class Patch:
             stack[0] = AstNode("-", Token("OP", "-", self.line_no, self.node.name), stack[0], AstNode("value", Token("NUMBER", 1, self.line_no, self.node.name), None, None))
         return stack[0]
 
+    def get_assert_ast(self):
+        node = self.get_ast()
+        left = AstNode("<", Token("OP", "<", self.line_no, self.node.name), node, AstNode("value", Token("NUMBER", 128, self.line_no, self.node.name), None, None))
+        right = AstNode(">", Token("OP", ">", self.line_no, self.node.name), node, AstNode("value", Token("NUMBER", -129, self.line_no, self.node.name), None, None))
+        return AstNode("&&", Token("OP", "&&", self.line_no, self.node.name), left, right)
+
 
 class ObjectFile:
     def __init__(self, filename: str):
