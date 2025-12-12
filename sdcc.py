@@ -1,4 +1,6 @@
+import os
 import binascii
+import re
 from typing import Optional
 
 from tokenizer import Token
@@ -17,16 +19,7 @@ class Patch:
         return self.size
     
     def get_ast(self) -> AstNode:
-        previous_sym = None
-        for sym in self.area.symbols:
-            if sym.offset <= self.offset and (previous_sym is None or previous_sym.offset < sym.offset):
-                previous_sym = sym
-        token_filename = f"{self.area.object_file.module_name}.c#?"
-        line_no = 0
-        if previous_sym:
-            token_filename = f"{self.area.object_file.module_name}.c#{previous_sym.name}"
-            line_no = self.offset - previous_sym.offset
-
+        token_filename, line_no = self.area.get_filename_line_for(self.offset)
         if isinstance(self.target, Area):
             node = AstNode("value", Token("ID", f"__area_start_{self.target.name}", line_no, token_filename), None, None)
         elif self.target.name.startswith("b_"):
@@ -52,6 +45,18 @@ class Area:
         self.data = bytearray(size)
         self.patches = []
     
+    def get_filename_line_for(self, offset: int):
+        previous_sym = None
+        for sym in self.symbols:
+            if sym.offset <= offset and (previous_sym is None or previous_sym.offset < sym.offset):
+                previous_sym = sym
+        if not previous_sym:
+            return f"{self.object_file.module_name}.c#?", 0
+        filename, line_no = self.object_file.get_filename_line_for(previous_sym.name, offset)
+        if filename is None:
+            return f"{self.object_file.module_name}.c#{previous_sym.name}", offset - previous_sym.offset
+        return filename, line_no
+
     def add_data(self, new_offset, new_data, patches):
         patches.sort()
         index = 0
@@ -113,6 +118,28 @@ class ObjectFile:
         self.module_name = None
         self.__symbols = []
         self.areas = []
+        self.__file_lookup = {}
+
+        list_filename = f"{os.path.splitext(filename)[0]}.lst"
+        if os.path.exists(list_filename):
+            latest_symbol_info = None
+            current_file = None
+            current_line = None
+            f = open(list_filename, "rt")
+            for line in f:
+                offset = line[4:12].strip()
+                if offset != "" and current_file is not None:
+                    offset = int(offset, 16)
+                    latest_symbol_info.append((offset, current_file, int(current_line)))
+                    current_file = None
+                    current_line = None
+                data = line[40:].rstrip()
+                if data.endswith("::"):
+                    print(data[:-2])
+                    latest_symbol_info = []
+                    self.__file_lookup[data[:-2]] = latest_symbol_info
+                elif m := re.match(r";([a-z0-9\.]+):([0-9]+)", data):
+                    current_file, current_line = m.groups()
 
         f = open(filename, "rt")
         header = f.readline().strip()
@@ -179,3 +206,13 @@ class ObjectFile:
                     new_data = None
                 case _:
                     print(f"Unknown line in sdcc object: {' '.join(line)}")
+
+    def get_filename_line_for(self, symbol: str, offset: int):
+        if symbol not in self.__file_lookup:
+            return None, None
+        prev_file, prev_line = None, None
+        for o, file, line in self.__file_lookup[symbol]:
+            if o > offset:
+                return prev_file, prev_line
+            prev_file, prev_line = file, line
+        return prev_file, prev_line
