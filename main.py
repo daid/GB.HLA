@@ -158,7 +158,7 @@ class Assembler:
                 for param in params[1:]:
                     pkey, pvalue = self._bracket_param(param)
                     gfx_params[pkey.value] = [self._resolve_expr(None, param) for param in pvalue]
-                self.__section_stack[-1].data += gfx.read(params[0][0], gfx_params)
+                self.__section_stack[-1].data += gfx.read(params[0][0], self._find_file_in_include_paths(params[0][0]), gfx_params)
             elif start.isA('DIRECTIVE', '#INCRGBDS'):
                 params = self._fetch_parameters(tok)
                 if len(params) != 1 or len(params[0]) != 1 or params[0][0].kind != 'STRING':

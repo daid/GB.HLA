@@ -13,7 +13,7 @@ def _bool_option(file_token: Token, options: Dict[str, List[Any]], key: str) -> 
     return True
 
 
-def read(file_token: Token, options: Dict[str, List[Any]]) -> bytes:
+def read(file_token: Token, filename: str, options: Dict[str, List[Any]]) -> bytes:
     tileheight = 8
     colormap = None
     unique = _bool_option(file_token, options, "UNIQUE")
@@ -41,7 +41,7 @@ def read(file_token: Token, options: Dict[str, List[Any]]) -> bytes:
     if options:
         raise AssemblerException(file_token, f"Unknown option: {next(iter(options.keys()))}")
 
-    img = PIL.Image.open(file_token.value)
+    img = PIL.Image.open(filename)
     if img.mode != "P":
         img = img.convert("P", palette=PIL.Image.ADAPTIVE)
     if (img.size[0] % 8) != 0:
