@@ -163,12 +163,12 @@ class Assembler:
                 params = self._fetch_parameters(tok)
                 if len(params) != 1 or len(params[0]) != 1 or params[0][0].kind != 'STRING':
                     raise AssemblerException(start, "Syntax error")
-                self._add_rgbds_object(params[0][0])
+                self._add_rgbds_object(self._find_file_in_include_paths(params[0][0]))
             elif start.isA('DIRECTIVE', '#INCSDCC'):
                 params = self._fetch_parameters(tok)
                 if len(params) != 1 or len(params[0]) != 1 or params[0][0].kind != 'STRING':
                     raise AssemblerException(start, "Syntax error")
-                self._add_sdcc_object(params[0][0])
+                self._add_sdcc_object(self._find_file_in_include_paths(params[0][0]))
             elif start.isA('DIRECTIVE', '#LAYOUT'):
                 self._define_layout(start, tok)
             elif start.isA('DIRECTIVE', '#SECTION'):
@@ -870,9 +870,9 @@ class Assembler:
             raise AssemblerException(result.token, "Expected a constant expression")
         return result.token.value
 
-    def _add_rgbds_object(self, filename: Token) -> None:
+    def _add_rgbds_object(self, filename: str) -> None:
         import rgbds
-        object_file = rgbds.ObjectFile(filename.value)
+        object_file = rgbds.ObjectFile(filename)
         sections = []
         for section in object_file.sections:
             layout = self.__layouts.get(section.get_layout_name())
@@ -900,9 +900,9 @@ class Assembler:
             # else:
             #     self.__constants[symbol.label] = symbol.value
 
-    def _add_sdcc_object(self, filename: Token) -> None:
+    def _add_sdcc_object(self, filename: str) -> None:
         import sdcc
-        object_file = sdcc.ObjectFile(filename.value)
+        object_file = sdcc.ObjectFile(filename)
         for area in object_file.areas:
             if area.size == 0:
                 continue
