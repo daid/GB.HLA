@@ -8,12 +8,13 @@ from expression import AstNode
 
 
 class Patch:
-    def __init__(self, area, offset, target, target_offset, size):
+    def __init__(self, area, offset, target, target_offset, size, shift=0):
         self.area = area
         self.offset = offset
         self.target = target
         self.target_offset = target_offset
         self.size = size
+        self.shift = shift
 
     def get_link_type(self):
         return self.size
@@ -29,6 +30,8 @@ class Patch:
             node = AstNode("value", Token("ID", self.target.name, line_no, token_filename), None, None)
         if self.target_offset:
             node = AstNode("+", Token("OP", "+", line_no, token_filename), node, AstNode("value", Token("NUMBER", self.target_offset, line_no, token_filename), None, None))
+        if self.shift:
+            node = AstNode(">>", Token("OP", ">>", line_no, token_filename), node, AstNode("value", Token("NUMBER", self.shift, line_no, token_filename), None, None))
         if self.size == 1:
             node = AstNode("&", Token("OP", "&", line_no, token_filename), node, AstNode("value", Token("NUMBER", 0xFF, line_no, token_filename), None, None))
         return node
@@ -76,6 +79,11 @@ class Area:
                     case 0x0B:
                         patch_offset = new_data[index] | (new_data[index + 1] << 8) | (new_data[index + 2] << 16) | (new_data[index + 3] << 24)
                         self.patches.append(Patch(self, new_offset, patch_target, patch_offset, 1))
+                        new_offset += 1
+                        index += 4
+                    case 0x8B:
+                        patch_offset = new_data[index] | (new_data[index + 1] << 8) | (new_data[index + 2] << 16) | (new_data[index + 3] << 24)
+                        self.patches.append(Patch(self, new_offset, patch_target, patch_offset, 1, 8))
                         new_offset += 1
                         index += 4
                     case _:
@@ -188,7 +196,7 @@ class ObjectFile:
                     patches = []
                     while data:
                         mode = data[0]
-                        if mode & 0xF0:
+                        if (mode & 0xF0) == 0xF0:
                             mode = ((mode << 8) & 0xF00) | data[1]
                             data = data[1:]
                         offset = data[1]
