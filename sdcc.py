@@ -135,7 +135,6 @@ class ObjectFile:
                     current_line = None
                 data = line[40:].rstrip()
                 if data.endswith("::"):
-                    print(data[:-2])
                     latest_symbol_info = []
                     self.__file_lookup[data[:-2]] = latest_symbol_info
                 elif m := re.match(r";([a-z0-9\.]+):([0-9]+)", data):
