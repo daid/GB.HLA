@@ -76,12 +76,12 @@ class Area:
                         self.patches.append(Patch(self, new_offset, patch_target, patch_offset, 2))
                         new_offset += 2
                         index += 2
-                    case 0x0B:
+                    case 0x09 | 0x0B:
                         patch_offset = new_data[index] | (new_data[index + 1] << 8) | (new_data[index + 2] << 16) | (new_data[index + 3] << 24)
                         self.patches.append(Patch(self, new_offset, patch_target, patch_offset, 1))
                         new_offset += 1
                         index += 4
-                    case 0x8B:
+                    case 0x89 | 0x8B:
                         patch_offset = new_data[index] | (new_data[index + 1] << 8) | (new_data[index + 2] << 16) | (new_data[index + 3] << 24)
                         self.patches.append(Patch(self, new_offset, patch_target, patch_offset, 1, 8))
                         new_offset += 1
