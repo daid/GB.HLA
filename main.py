@@ -388,7 +388,7 @@ class Assembler:
             sa.dump_free_space()
         return self.__sections
 
-    def build_rom(self):
+    def build_rom(self, pad_value=None):
         max_bank = {}
         for section in self.__sections:
             if section.bank is None:
@@ -404,6 +404,9 @@ class Assembler:
                 layout_size *= bank_count
             rom_size = max(section.layout.rom_location + layout_size, rom_size)
         self.__rom = bytearray(rom_size)
+        if pad_value:
+            for n in range(len(self.__rom)):
+                self.__rom[n] = pad_value
         for section in self.__sections:
             if section.layout.rom_location is None:
                 continue
@@ -927,6 +930,7 @@ def main():
     parser.add_argument("--output")
     parser.add_argument("--symbols")
     parser.add_argument("--include-path", "-I", action='append')
+    parser.add_argument("--pad", "-p", default=None, type=lambda n: int(n, 0))
     parser.add_argument("--dump", action="store_true")
 
     args = parser.parse_args()
@@ -951,7 +955,7 @@ def main():
         exit(1)
     else:
         if args.output:
-            open(args.output, "wb").write(a.build_rom())
+            open(args.output, "wb").write(a.build_rom(pad_value=args.pad))
         if args.symbols:
             a.save_symbols(args.symbols)
         if args.dump:

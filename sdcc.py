@@ -26,6 +26,9 @@ class Patch:
         elif self.target.name.startswith("b_"):
             node = AstNode("value", Token("ID", self.target.name[1:], line_no, token_filename), None, None)
             node = AstNode("call", Token("ID", "BANK", 1, token_filename), None, AstNode('param', node.token, node, None))
+        elif self.target.name.startswith("___bank_"):
+            node = AstNode("value", Token("ID", self.target.name[8:], line_no, token_filename), None, None)
+            node = AstNode("call", Token("ID", "BANK", 1, token_filename), None, AstNode('param', node.token, node, None))
         else:
             node = AstNode("value", Token("ID", self.target.name, line_no, token_filename), None, None)
         if self.target_offset:
@@ -111,6 +114,7 @@ class Area:
     def __repr__(self):
         return f"<Area: {self.name}>"
 
+
 class Symbol:
     def __init__(self, area: Optional[Area], name: str, offset: int, is_label: bool):
         self.name = name
@@ -120,6 +124,7 @@ class Symbol:
     
     def __repr__(self):
         return f"<Symbol: {self.name}>"
+
 
 class ObjectFile:
     def __init__(self, filename: str):
