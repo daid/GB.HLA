@@ -923,6 +923,9 @@ class Assembler:
                 s.link[patch.offset] = (patch.get_link_type(), patch.get_ast())
             self.__sections.append(s)
 
+            for offset, label in area.get_debug_labels():
+                self.__labels[label] = (s, offset)
+
 def main():
     import argparse
     parser = argparse.ArgumentParser()

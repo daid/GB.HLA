@@ -1,7 +1,7 @@
 import os
 import binascii
 import re
-from typing import Optional
+from typing import Optional, List, Tuple
 
 from tokenizer import Token
 from expression import AstNode
@@ -111,6 +111,13 @@ class Area:
     def get_name_token(self) -> Token:
         return Token('STRING', self.name, 1, self.name)
 
+    def get_debug_labels(self) -> List[Tuple[int, str]]:
+        result = []
+        for symbol in self.symbols:
+            for offset, filename, line_nr in self.object_file.get_filename_line_offsets_for(symbol.name):
+                result.append((offset, f"#{filename}:{line_nr}"))
+        return result
+
     def __repr__(self):
         return f"<Area: {self.name}>"
 
@@ -141,7 +148,7 @@ class ObjectFile:
             f = open(list_filename, "rt")
             for line in f:
                 offset = line[4:12].strip()
-                if offset != "" and current_file is not None:
+                if offset != "" and current_file is not None and latest_symbol_info is not None:
                     offset = int(offset, 16)
                     latest_symbol_info.append((offset, current_file, int(current_line)))
                     current_file = None
@@ -150,8 +157,10 @@ class ObjectFile:
                 if data.endswith("::"):
                     latest_symbol_info = []
                     self.__file_lookup[data[:-2]] = latest_symbol_info
-                elif m := re.match(r";([a-z0-9\.]+):([0-9]+)", data):
+                elif m := re.match(r";([a-zA-Z0-9/\\.]+):([0-9]+)", data):
                     current_file, current_line = m.groups()
+        else:
+            print(f"Warning: failed to read {list_filename} for detailed file/line info")
 
         f = open(filename, "rt")
         header = f.readline().strip()
@@ -228,3 +237,8 @@ class ObjectFile:
                 return prev_file, prev_line
             prev_file, prev_line = file, line
         return prev_file, prev_line
+
+    def get_filename_line_offsets_for(self, symbol: str) -> List[Tuple[int, str, int]]:
+        if symbol not in self.__file_lookup:
+            return []
+        return self.__file_lookup[symbol]
