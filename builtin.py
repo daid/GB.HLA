@@ -74,7 +74,7 @@ def bank_max(assembler, param: AstNode) -> AstNode:
     if label_token.kind != "ID":
         raise AssemblerException(param.token, "Expected a layout type to BANK_MAX()")
 
-    count = 0
+    count = -1
     for section in assembler.get_sections(label_token.value):
         count = max(count, section.bank if section.bank is not None else 0)
     return AstNode('value', Token('NUMBER', count, label_token.line_nr, label_token.filename), None, None)
