@@ -49,6 +49,7 @@ The `#INCGFX` directive allows you to include a graphics file converted to Game 
 The `#INCGFX` directive expects a filename as first parameter, and `KEY[VALUE]` parameters after this. The parameters influence how the graphics are imported:
 
 * `TILEHEIGHT[8]`, `TILEHEIGHT[16]`. The 8 pixel height tiles are the default. This imports each 8x8 tile in the file, from the left to the right then top to bottom. With a height of 16, these tiles are 8x16 pixels. Which are generally used for OAM sprites.
+* `BPP[1]`. Setup 1 bit per pixel instead of the default 2 bits per pixel.
 * `COLORMAP[a, b, c, d]`. Setup which 4 colors to use for the 4 gameboy colors. Each pixel in the file is mapped to closest of these 4 colors.
 * `RANGE[start, end]`. Only store tiles from start (inclusive) to end (exclusive). This allows a single image to be used for multiple blocks of data in the ROM.
 * `UNIQUE`. Remove all duplicate tiles from the graphics. This you would generally combine with a 2nd `#INCGFX` that uses `TILEMAP`.

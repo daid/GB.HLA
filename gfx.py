@@ -20,15 +20,22 @@ def read(file_token: Token, filename: str, options: Dict[str, List[Any]]) -> byt
     return_tilemap = _bool_option(file_token, options, "TILEMAP")
     export_range = None
     debug = _bool_option(file_token, options, "DEBUG")
+    bpp = 2
     if "TILEHEIGHT" in options:
         if len(options["TILEHEIGHT"]) != 1 or options["TILEHEIGHT"][0].kind != "value":
             raise AssemblerException(file_token, "Syntax error in TILEHEIGHT[n]")
         tileheight = options.pop("TILEHEIGHT")[0].token.value
+    if "BPP" in options:
+        if len(options["BPP"]) != 1 or options["BPP"][0].kind != "value":
+            raise AssemblerException(file_token, "Syntax error in BPP[n]")
+        bpp = options.pop("BPP")[0].token.value
+        if bpp not in [1, 2]:
+            raise AssemblerException(file_token, "Range error in BPP[n]")
     if "COLORMAP" in options:
-        if len(options["COLORMAP"]) != 4:
+        if len(options["COLORMAP"]) != (1 << bpp):
             raise AssemblerException(file_token, "Syntax error in COLORMAP[n, n, n, n]")
         colormap = []
-        for n in range(4):
+        for n in range(1 << bpp):
             if options["COLORMAP"][n].kind != "value":
                 raise AssemblerException(file_token, "Syntax error in COLORMAP[n, n, n, n]")
             colormap.append(options["COLORMAP"][n].token.value)
@@ -71,7 +78,7 @@ def read(file_token: Token, filename: str, options: Dict[str, List[Any]]) -> byt
 
     cols = img.size[0] // 8
     rows = img.size[1] // tileheight
-    result = bytearray(rows * cols * tileheight * 2)
+    result = bytearray(rows * cols * tileheight * bpp)
     index = 0
     for ty in range(rows):
         for tx in range(cols):
@@ -85,16 +92,19 @@ def read(file_token: Token, filename: str, options: Dict[str, List[Any]]) -> byt
                     if c & 2:
                         b |= 0x80 >> x
                 result[index] = a
-                result[index+1] = b
-                index += 2
+                if bpp == 1:
+                    index += 1
+                else:
+                    result[index+1] = b
+                    index += 2
     if unique or return_tilemap:
         unique_tiles = b''
         tile_lookup = {}
         tilemap = bytearray()
-        for n in range(0, len(result), tileheight * 2):
-            tile = bytes(result[n:n+tileheight*2])
+        for n in range(0, len(result), tileheight * bpp):
+            tile = bytes(result[n:n+tileheight*bpp])
             if tile not in tile_lookup:
-                nr = len(unique_tiles) // (tileheight*2)
+                nr = len(unique_tiles) // (tileheight*bpp)
                 if nr > 255:
                     raise AssemblerException(file_token, "Too many unique tiles in graphics for tilemap")
                 tile_lookup[tile] = nr
@@ -106,5 +116,5 @@ def read(file_token: Token, filename: str, options: Dict[str, List[Any]]) -> byt
             return tilemap
         result = unique_tiles
     if export_range:
-        return result[export_range[0]*tileheight*2:export_range[1]*tileheight*2]
+        return result[export_range[0]*tileheight*bpp:export_range[1]*tileheight*bpp]
     return result
