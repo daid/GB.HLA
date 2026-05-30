@@ -69,7 +69,7 @@ def read(file_token: Token, filename: str, options: Dict[str, List[Any]]) -> byt
         brightness_index = [((palette[index] >> 16) + ((palette[index] >> 8) & 0xFF) + (palette[index] & 0xFF), index) for count, index in img.getcolors()]
         brightness_index.sort(reverse=True)
         for target, (_, idx) in enumerate(brightness_index):
-            remap[idx] = target * 4 // len(brightness_index)
+            remap[idx] = target * (1 << bpp) // len(brightness_index)
 
     if debug:
         print(f"Image: {file_token.value}: {img.size[0]}x{img.size[1]} has colors:")
