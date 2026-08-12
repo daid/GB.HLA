@@ -83,8 +83,8 @@ class Assembler:
         self.__layouts: Dict[str, Layout] = {}
         self.__rom: Optional[bytearray] = None
         self.__post_build_link: List[Tuple[Section, int, int, AstNode]] = []
-        self.__section_stack: List[Section] = []
-        self.__block_macro_stack: List[Tuple[Macro, Dict[str, List[Token]]]] = []
+        self.__current_section: Optional[Section] = None
+        self.__scope_stack: List[Union[Section, Tuple[Macro, Dict[str, List[Token]]]]] = []
         self.__user_stack: Dict[str, List[int]] = {}
         self.__linking_allocation_done = False
     
@@ -92,15 +92,15 @@ class Assembler:
         self.__include_paths.append(path)
 
     def process_file(self, filename) -> None:
-        self.__section_stack = []
-        self.__block_macro_stack = []
+        self.__current_section = None
+        self.__scope_stack = []
         self.__current_scope = None
 
         self.__include_paths.append(os.path.dirname(filename))
         self._process_file(filename)
         self.__include_paths.pop()
 
-        if self.__section_stack:
+        if self.__current_section:
             raise AssemblerException(Token('EOF', '', 1, filename), f"End of file reached with section open")
 
     def _process_file(self, filename):
@@ -138,7 +138,7 @@ class Assembler:
                 params = self._fetch_parameters(tok)
                 if len(params[0]) != 1 or params[0][0].kind != 'STRING':
                     raise AssemblerException(start, "Syntax error")
-                if not self.__section_stack:
+                if not self.__current_section:
                     raise AssemblerException(start, "Expression outside of section")
                 bin_params = {}
                 for param in params[1:]:
@@ -147,18 +147,18 @@ class Assembler:
                 if bin_params:
                     raise AssemblerException(start, f"Unknown option: {next(iter(bin_params.keys()))}")
                 with open(self._find_file_in_include_paths(params[0][0]), "rb") as f:
-                    self.__section_stack[-1].data += f.read()
+                    self.__current_section.data += f.read()
             elif start.isA('DIRECTIVE', '#INCGFX'):
                 params = self._fetch_parameters(tok)
                 if len(params[0]) != 1 or params[0][0].kind != 'STRING':
                     raise AssemblerException(start, "Syntax error")
-                if not self.__section_stack:
+                if not self.__current_section:
                     raise AssemblerException(start, "Expression outside of section")
                 gfx_params = {}
                 for param in params[1:]:
                     pkey, pvalue = self._bracket_param(param)
                     gfx_params[pkey.value] = [self._resolve_expr(None, param) for param in pvalue]
-                self.__section_stack[-1].data += gfx.read(params[0][0], self._find_file_in_include_paths(params[0][0]), gfx_params)
+                self.__current_section.data += gfx.read(params[0][0], self._find_file_in_include_paths(params[0][0]), gfx_params)
             elif start.isA('DIRECTIVE', '#INCRGBDS'):
                 params = self._fetch_parameters(tok)
                 if len(params) != 1 or len(params[0]) != 1 or params[0][0].kind != 'STRING':
@@ -191,7 +191,7 @@ class Assembler:
                         if condition.token.value == 0:
                             raise AssemblerException(condition.token, f"Assertion failure: {message}")
                     else:
-                        self.__section_stack[-1].asserts.append((len(self.__section_stack[-1].data), condition, message))
+                        self.__current_section.asserts.append((len(self.__current_section.data), condition, message))
             elif start.isA('DIRECTIVE', '#PRINT'):
                 for expr in self._fetch_parameters(tok):
                     expr = self._process_expression(expr)
@@ -204,13 +204,13 @@ class Assembler:
                     value = self._resolve_to_number(condition)
                     allow = allow and (value != 0)
                 if allow:
-                    self.__block_macro_stack.append((None, None))  # Empty macro block to indicate we have an open true IF part
+                    self.__scope_stack.append((None, None))  # Empty macro block to indicate we have an open true IF part
                 else:
                     self._get_raw_macro_block(start, tok)
                     if tok.peek().isA('ID', 'ELSE'):
                         tok.pop()
                         tok.expect('{')
-                        self.__block_macro_stack.append((None, None))  # Empty macro block to indicate we have an open true IF part
+                        self.__scope_stack.append((None, None))  # Empty macro block to indicate we have an open true IF part
             elif start.isA('DIRECTIVE', '#FOR'):
                 parameters = self._fetch_parameters(tok, params_end='{')
                 if len(parameters) != 3:
@@ -253,23 +253,23 @@ class Assembler:
                     raise AssemblerException(start, f"Stack {stack_name.token.value} is empty while trying to pop")
                 self.__constants[value.value] = self.__user_stack[stack_name.token.value].pop()
             elif start.isA('ID', 'DS'):
-                if not self.__section_stack:
+                if not self.__current_section:
                     raise AssemblerException(start, "Expression outside of section")
                 for param in self._fetch_parameters(tok):
                     value = self._resolve_to_number(param)
                     if value < 0:
                         raise AssemblerException(param.token, "DS needs a positive number")
-                    self.__section_stack[-1].data += bytes(value)
+                    self.__current_section.data += bytes(value)
             elif start.isA('ID', 'DB'):
-                if not self.__section_stack:
+                if not self.__current_section:
                     raise AssemblerException(start, "Expression outside of section")
                 for param in self._fetch_parameters(tok):
-                    self.__section_stack[-1].add8(self._process_expression(param))
+                    self.__current_section.add8(self._process_expression(param))
             elif start.isA('ID', 'DW'):
-                if not self.__section_stack:
+                if not self.__current_section:
                     raise AssemblerException(start, "Expression outside of section")
                 for param in self._fetch_parameters(tok):
-                    self.__section_stack[-1].add16(self._process_expression(param))
+                    self.__current_section.add16(self._process_expression(param))
             elif start.isA('ID') and tok.peek().isA('='):
                 tok.pop()
                 params = self._fetch_parameters(tok)
@@ -285,19 +285,23 @@ class Assembler:
                     self.__current_scope = label
                 if label in self.__labels:
                     raise AssemblerException(start, "Duplicate label")
-                if not self.__section_stack:
+                if not self.__current_section:
                     raise AssemblerException(start, "Trying to place label outside of section")
-                self.__labels[label] = (self.__section_stack[-1], len(self.__section_stack[-1].data))
+                self.__labels[label] = (self.__current_section, len(self.__current_section.data))
             elif start.isA('LABEL'):  # anonymous label
-                if not self.__section_stack:
+                if not self.__current_section:
                     raise AssemblerException(start, "Trying to place an anonymous label outside of section")
                 self.__anonymous_label_count += 1
-                self.__labels[f"__anonymous_{self.__anonymous_label_count}"] = (self.__section_stack[-1], len(self.__section_stack[-1].data))
+                self.__labels[f"__anonymous_{self.__anonymous_label_count}"] = (self.__current_section, len(self.__current_section.data))
             elif start.isA('ID'):
                 self._process_statement(start, tok)
             elif start.isA('}'):
-                if self.__block_macro_stack:
-                    macro, macro_args = self.__block_macro_stack.pop()
+                if self.__scope_stack and isinstance(self.__scope_stack[-1], Section):
+                    self.__scope_stack.pop()
+                    section_stack = [scope for scope in self.__scope_stack if isinstance(scope, Section)]
+                    self.__current_section = section_stack[-1] if section_stack else None
+                elif self.__scope_stack:
+                    macro, macro_args = self.__scope_stack.pop()
                     if macro is None:
                         # End of an IF block, check if there is an ELSE and skip that part.
                         if tok.peek().isA('ID', 'ELSE'):
@@ -310,7 +314,7 @@ class Assembler:
                         if tok.peek().isA('ID') and tok.peek().value in macro.chains:
                             macro = macro.chains[tok.peek().value]
                             macro_contents = macro.contents
-                            self.__block_macro_stack.append((macro, macro_args))
+                            self.__scope_stack.append((macro, macro_args))
                             tok.pop()
                             tok.expect('{')
                         prepend = []
@@ -320,8 +324,6 @@ class Assembler:
                             else:
                                 prepend.append(token)
                         tok.prepend(prepend)
-                elif self.__section_stack:
-                    self.__section_stack.pop()
                 else:
                     raise AssemblerException(start, f"Unexpected }}")
             else:
@@ -548,7 +550,8 @@ class Assembler:
                     raise AssemblerException(pkey, f"Bank number needs to be lower then {layout.bank_max}")
             else:
                 raise AssemblerException(pkey, "Unknown parameter to #SECTION")
-        self.__section_stack.append(section)
+        self.__current_section = section
+        self.__scope_stack.append(section)
         self.__sections.append(section)
 
     def _process_statement(self, start: Token, tok: Tokenizer):
@@ -575,7 +578,7 @@ class Assembler:
                     prepend.append(Token(",", ",", 0, ""))
             prepend.append(end_token)
         elif end_token.isA('{'):
-            self.__block_macro_stack.append((macro, macro_args))
+            self.__scope_stack.append((macro, macro_args))
         elif macro.post_contents:
             for token in macro.post_contents:
                 if token.kind == 'ID' and token.value in macro_args:

@@ -55,3 +55,24 @@ class TestAssemblerFMacro(unittest.TestCase):
     def test_duplicate_definition_args_complex(self):
         with self.assertRaises(AssemblerException) as context:
             self._simple('#MACRO TEST [_a] { db 1 }\n#MACRO TEST [_b] { db 2}', "")
+
+    def test_section_and_macro_nesting(self):
+        a = Assembler()
+        a.process_code("""
+        #MACRO TEST _x { db _x }
+        #LAYOUT ROM0[$0000, $4000], AT[0]
+        #SECTION "TEST", ROM0[0] {
+            TEST 1 {
+                db 2
+                #SECTION "TEST2", ROM0[5] {
+                    db 3
+                }
+                db 4
+            }
+        }""")
+        s = a.link()
+        self.assertEqual(len(s), 2)
+        self.assertEqual(s[0].base_address, 0)
+        self.assertEqual(s[1].base_address, 5)
+        self.assertEqual(s[0].data, b'\x01\x02\x04')
+        self.assertEqual(s[1].data, b'\x03')
