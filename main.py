@@ -41,6 +41,7 @@ class Section:
         self.data = bytearray()
         self.link: Dict[int, Tuple[int, AstNode]] = {}
         self.asserts: List[Tuple[int, AstNode, str]] = []
+        self.load_section_source = None
 
     def add16(self, node: AstNode) -> None:
         if node.kind == 'value' and node.token.kind == 'NUMBER':
@@ -50,6 +51,8 @@ class Section:
             self.link[len(self.data)] = (2, node)
             self.data.append(0)
             self.data.append(0)
+        if self.load_section_source:
+            self.load_section_source.add16(node)
 
     def add8(self, node: AstNode) -> None:
         if node.kind == 'value' and node.token.kind == 'NUMBER':
@@ -61,6 +64,13 @@ class Section:
         else:
             self.link[len(self.data)] = (1, node)
             self.data.append(0)
+        if self.load_section_source:
+            self.load_section_source.add8(node)
+
+    def append_data(self, data: bytes):
+        self.data += data
+        if self.load_section_source:
+            self.load_section_source.append_data(data)
 
     def __repr__(self) -> str:
         if self.bank is not None:
@@ -147,7 +157,7 @@ class Assembler:
                 if bin_params:
                     raise AssemblerException(start, f"Unknown option: {next(iter(bin_params.keys()))}")
                 with open(self._find_file_in_include_paths(params[0][0]), "rb") as f:
-                    self.__current_section.data += f.read()
+                    self.__current_section.append_data(f.read())
             elif start.isA('DIRECTIVE', '#INCGFX'):
                 params = self._fetch_parameters(tok)
                 if len(params[0]) != 1 or params[0][0].kind != 'STRING':
@@ -158,7 +168,7 @@ class Assembler:
                 for param in params[1:]:
                     pkey, pvalue = self._bracket_param(param)
                     gfx_params[pkey.value] = [self._resolve_expr(None, param) for param in pvalue]
-                self.__current_section.data += gfx.read(params[0][0], self._find_file_in_include_paths(params[0][0]), gfx_params)
+                self.__current_section.append_data(gfx.read(params[0][0], self._find_file_in_include_paths(params[0][0]), gfx_params))
             elif start.isA('DIRECTIVE', '#INCRGBDS'):
                 params = self._fetch_parameters(tok)
                 if len(params) != 1 or len(params[0]) != 1 or params[0][0].kind != 'STRING':
@@ -172,7 +182,9 @@ class Assembler:
             elif start.isA('DIRECTIVE', '#LAYOUT'):
                 self._define_layout(start, tok)
             elif start.isA('DIRECTIVE', '#SECTION'):
-                self._start_section(start, tok)
+                self._start_section(start, tok, "section")
+            elif start.isA('DIRECTIVE', '#LOAD'):
+                self._start_section(start, tok, "load")
             elif start.isA('DIRECTIVE', '#ASSERT'):
                 message = ""
                 conditions = []
@@ -259,7 +271,7 @@ class Assembler:
                     value = self._resolve_to_number(param)
                     if value < 0:
                         raise AssemblerException(param.token, "DS needs a positive number")
-                    self.__current_section.data += bytes(value)
+                    self.__current_section.append_data(bytes(value))
             elif start.isA('ID', 'DB'):
                 if not self.__current_section:
                     raise AssemblerException(start, "Expression outside of section")
@@ -514,7 +526,7 @@ class Assembler:
                 raise AssemblerException(pkey, "Unknown parameter to #LAYOUT")
         self.__layouts[name.value.upper()] = layout
 
-    def _start_section(self, start: Token, tok: Tokenizer):
+    def _start_section(self, start: Token, tok: Tokenizer, section_style: str):
         params = self._fetch_parameters(tok, params_end='{')
         if len(params) < 2:
             raise AssemblerException(start, "Expected name and type of section")
@@ -550,6 +562,12 @@ class Assembler:
                     raise AssemblerException(pkey, f"Bank number needs to be lower then {layout.bank_max}")
             else:
                 raise AssemblerException(pkey, "Unknown parameter to #SECTION")
+        if section_style == "load":
+            if not self.__current_section:
+                raise AssemblerException(pkey, "A #LOAD section should be inside a #SECTION")
+            if self.__current_section.load_section_source:
+                raise AssemblerException(pkey, "Cannot nest a #LOAD section in a #LOAD section")
+            section.load_section_source = self.__current_section
         self.__current_section = section
         self.__scope_stack.append(section)
         self.__sections.append(section)
