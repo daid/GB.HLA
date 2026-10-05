@@ -103,6 +103,9 @@ class Area:
             return "WRAM0"
         raise NotImplementedError(f"Area type: {self.type_name}")
     
+    def get_layout_token(self) -> Token:
+        return Token('STRING', self.get_layout_name(), 1, self.name)
+
     def get_bank(self) -> int:
         if self.type_name.startswith("_CODE_"):
             return int(self.type_name[6:])

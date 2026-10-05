@@ -45,6 +45,18 @@ class Section:
         self.node = None
         self.data = None
         self.patches = []
+    
+    def has_bank(self) -> bool:
+        match self.type:
+            case 0: return False
+            case 1: return False
+            case 2: return True
+            case 3: return False
+            case 4: return False
+            case 5: return True
+            case 6: return True
+            case 7: return False
+        raise NotImplementedError(f"Section type: {self.type:02x}")
 
     def get_layout_name(self) -> str:
         match self.type:
@@ -57,6 +69,9 @@ class Section:
             case 6: return "SRAM"
             case 7: return "OAM"
         raise NotImplementedError(f"Section type: {self.type:02x}")
+
+    def get_layout_token(self) -> Token:
+        return Token('STRING', self.get_layout_name(), self.line_no, self.node.name)
 
     def get_name_token(self) -> Token:
         return Token('STRING', self.name, self.line_no, self.node.name)

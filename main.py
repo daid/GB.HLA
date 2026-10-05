@@ -179,6 +179,11 @@ class Assembler:
                 if len(params) != 1 or len(params[0]) != 1 or params[0][0].kind != 'STRING':
                     raise AssemblerException(start, "Syntax error")
                 self._add_sdcc_object(self._find_file_in_include_paths(params[0][0]))
+            elif start.isA('DIRECTIVE', '#INCCLANG'):
+                params = self._fetch_parameters(tok)
+                if len(params) != 1 or len(params[0]) != 1 or params[0][0].kind != 'STRING':
+                    raise AssemblerException(start, "Syntax error")
+                self._add_clang_object(self._find_file_in_include_paths(params[0][0]))
             elif start.isA('DIRECTIVE', '#LAYOUT'):
                 self._define_layout(start, tok)
             elif start.isA('DIRECTIVE', '#SECTION'):
@@ -535,33 +540,22 @@ class Assembler:
             raise AssemblerException(name.token, "Expected name of section")
         if not params[1][0].isA('ID'):
             raise AssemblerException(name.token, "Expected type of section")
-        for section in self.__sections:
-            if section.name == name.token.value:
-                raise AssemblerException(name.token, "Duplicate section name")
         section_type, section_type_param = self._bracket_param(params[1])
         address = -1
         if section_type_param:
             address = section_type_param[0].token.value
         if section_type.value.upper() not in self.__layouts:
             raise AssemblerException(section_type, "Section type not found")
-        layout = self.__layouts[section_type.value.upper()]
-        if address > -1 and not (layout.start_addr <= address < layout.end_addr):
-            raise AssemblerException(section_type, "Address out of range for section")
-        section = Section(layout, name.token, address)
+        bank = None
         for param in params[2:]:
             pkey, pvalue = self._bracket_param(param)
             if pkey.value.upper() == 'BANK':
                 if len(pvalue) != 1:
                     raise AssemblerException(pkey, "BANK requires an argument")
-                if not layout.banked:
-                    raise AssemblerException(pkey, "Cannot assign a bank to an unbanked section")
-                section.bank = pvalue[0].token.value
-                if section.bank < layout.bank_min:
-                    raise AssemblerException(pkey, f"Bank number need to be at least {layout.bank_min}")
-                if layout.bank_max is not None and section.bank >= layout.bank_max:
-                    raise AssemblerException(pkey, f"Bank number needs to be lower then {layout.bank_max}")
+                bank = pvalue[0].token.value
             else:
                 raise AssemblerException(pkey, "Unknown parameter to #SECTION")
+        section = self._create_section(section_type, name.token, address, bank)
         if section_style == "load":
             if not self.__current_section:
                 raise AssemblerException(pkey, "A #LOAD section should be inside a #SECTION")
@@ -570,7 +564,27 @@ class Assembler:
             section.load_section_source = self.__current_section
         self.__current_section = section
         self.__scope_stack.append(section)
+
+    def _create_section(self, layout_name: Token, name: Token, address: int = -1, bank: Optional[int] = None) -> Section:
+        for section in self.__sections:
+            if section.name == name.value:
+                raise AssemblerException(name, f"Duplicate section name: {name.value}")
+        if layout_name.value.upper() not in self.__layouts:
+            raise AssemblerException(layout_name, f"Section type not found: {layout_name.value}")
+        layout = self.__layouts[layout_name.value.upper()]
+        if address > -1 and not (layout.start_addr <= address < layout.end_addr):
+            raise AssemblerException(layout_name, "Address out of range for section")
+        if bank is not None:
+            if not layout.banked:
+                raise AssemblerException(layout_name, f"Cannot assign a bank to an unbanked section")
+            if bank < layout.bank_min:
+                raise AssemblerException(pkey, f"Bank number need to be at least {layout.bank_min}")
+            if layout.bank_max is not None and bank >= layout.bank_max:
+                raise AssemblerException(pkey, f"Bank number needs to be lower then {layout.bank_max}")
+
+        section = Section(layout, name, address, bank)
         self.__sections.append(section)
+        return section
 
     def _process_statement(self, start: Token, tok: Tokenizer):
         params, end_token = self._fetch_parameters(tok, params_end=('NEWLINE', '{'))
@@ -899,11 +913,7 @@ class Assembler:
         object_file = rgbds.ObjectFile(filename)
         sections = []
         for section in object_file.sections:
-            layout = self.__layouts.get(section.get_layout_name())
-            for s in self.__sections:
-                if s.name == section.name:
-                    raise AssemblerException(section.get_name_token(), "Duplicate section name")
-            s = Section(layout, section.get_name_token(), section.address, section.bank if layout.banked else None)
+            s = self._create_section(section.get_layout_token(), section.get_name_token(), section.address, section.bank if section.has_bank() else None)
             if section.data:
                 s.data = bytearray(section.data)
             else:
@@ -912,7 +922,6 @@ class Assembler:
                 s.link[patch.offset] = (patch.get_link_type(), patch.get_ast())
                 if patch.patch_type == 3:  # jr target
                     s.asserts.append((patch.offset, patch.get_assert_ast(), "JR out of range"))
-            self.__sections.append(s)
             sections.append(s)
         for symbol in object_file.symbols:
             if symbol.type == 1:
@@ -930,22 +939,37 @@ class Assembler:
         for area in object_file.areas:
             if area.size == 0:
                 continue
-            layout = self.__layouts.get(area.get_layout_name())
-            for s in self.__sections:
-                if s.name == area.name:
-                    raise AssemblerException(area.get_name_token(), "Duplicate section name")
-            s = Section(layout, area.get_name_token(), area.address, area.get_bank() if layout.banked else None)
+            s = self._create_section(area.get_layout_token(), area.get_name_token(), area.address, area.get_bank())
             s.data = area.data
             self.__labels[f"__area_start_{area.name}"] = (s, 0)
             for symbol in area.symbols:
                 assert symbol.is_label
+                assert symbol.name not in self.__labels
                 self.__labels[symbol.name] = (s, symbol.offset)
             for patch in area.patches:
                 s.link[patch.offset] = (patch.get_link_type(), patch.get_ast())
-            self.__sections.append(s)
 
             for offset, label in area.get_debug_labels():
                 self.__labels[label] = (s, offset)
+
+    def _add_clang_object(self, filename: str) -> None:
+        import clang
+        object_file = clang.ObjectFile(filename)
+        text_section = object_file.section_by_name[".text"]
+        rodata_section = object_file.section_by_name[".rodata"]
+        s = self._create_section(Token("ID", "ROMX", -1, ""), Token("STRING", filename, -1, ""), -1, None)
+        s.data = bytearray(text_section.data + rodata_section.data)
+        for symbol_name, offset in text_section.symbols:
+            assert symbol_name not in self.__labels
+            self.__labels[symbol_name] = (s, offset)
+        for symbol_name, offset in rodata_section.symbols:
+            assert symbol_name not in self.__labels
+            self.__labels[symbol_name] = (s, offset + len(text_section.data))
+        for patch in text_section.reloc:
+            s.link[patch.offset] = (patch.get_link_type(), patch.get_ast())
+        for patch in rodata_section.reloc:
+            s.link[patch.offset + len(text_section.data)] = (patch.get_link_type(), patch.get_ast())
+
 
 def main():
     import argparse
