@@ -19,6 +19,10 @@ class TestAssemblerBasics(unittest.TestCase):
         self.assertEqual(self._simple("dw label\nlabel:"), b'\x02\x00')
     def test_local_label(self):
         self.assertEqual(self._simple("dw label, label.part\nlabel: ds 1\n.part:"), b'\x04\x00\x05\x00\x00')
+    def test_local_label2(self):
+        self.assertEqual(self._simple("dw label, label.part, label.part.subpart\nlabel: ds 1\n.part: ds 1\n..subpart:\n"), b'\x06\x00\x07\x00\x08\x00\x00\x00')
+    def test_local_label3(self):
+        self.assertEqual(self._simple("label: dw label\n.sub: dw .sub"), b'\x00\x00\x02\x00')
     def test_non_scope_label(self):
         self.assertEqual(self._simple("dw label, __part, label.part\nlabel: ds 1\n__part: ds 1\n.part:"), b'\x06\x00\x07\x00\x08\x00\x00\x00')
     def test_ds(self):

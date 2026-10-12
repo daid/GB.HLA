@@ -27,6 +27,27 @@ def params_to_string(params: List[List[Token]]) -> str:
     return ", ".join(tokens_to_string(p) for p in params)
 
 
+def resolve_label_scope(current_scope: Optional[str], label_token: Token) -> str:
+    if label_token.value.startswith("__"):
+        return label_token.value
+    label = label_token.value
+    child_count = 0
+    while len(label) > child_count and label[child_count] == '.':
+        child_count += 1
+    if child_count == 0:
+        return label
+    if current_scope is None:
+        raise AssemblerException(label_token, f"Local label without parent scope")
+    start_idx = current_scope.find(".")
+    for _ in range(child_count - 1):
+        if start_idx < 0:
+            raise AssemblerException(label_token, f"Child label without deep enough parent scope")
+        start_idx = current_scope.find(".", start_idx+1)
+    if start_idx < 0:
+        return current_scope + label[child_count-1:]
+    return current_scope[:start_idx] + label[child_count-1:]
+
+
 class PostRomBuild(Exception):
     pass
 
@@ -295,10 +316,8 @@ class Assembler:
                 self.__constants[start.value] = self._resolve_to_number_or_string(params[0])
             elif start.isA('ID') and tok.peek().isA('LABEL'):
                 tok.pop()
-                label = start.value
-                if start.value.startswith("."):
-                    label = f"{self.__current_scope}{label}"
-                elif not start.value.startswith("__"):
+                label = resolve_label_scope(self.__current_scope, start)
+                if not label.startswith("__"):
                     self.__current_scope = label
                 if label in self.__labels:
                     raise AssemblerException(start, "Duplicate label")
@@ -725,7 +744,7 @@ class Assembler:
                 params.append(param)
             else:
                 if t.kind == 'ID' and t.value.startswith("."):
-                    t = Token('ID', f"{self.__current_scope}{t.value}", t.line_nr, t.filename)
+                    t = Token('ID', resolve_label_scope(self.__current_scope, t), t.line_nr, t.filename)
                 param.append(t)
         if not isinstance(params_end, str):
             return params, end_token
