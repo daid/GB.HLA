@@ -340,8 +340,7 @@ class Assembler:
                     macro, macro_args = self.__scope_stack.pop()
                     if macro is None:
                         # End of an IF block, check if there is an ELSE and skip that part.
-                        if tok.peek().isA('ID', 'ELSE'):
-                            tok.pop()
+                        if tok.match('ID', 'ELSE'):
                             tok.expect('{')
                             self._get_raw_macro_block(start, tok)
                     else:

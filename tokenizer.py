@@ -137,8 +137,8 @@ class Tokenizer:
             raise AssemblerException(token, f"Expected {kind} got {token.kind}")
         return token
 
-    def match(self, kind) -> Optional[Token]:
-        if self.peek().isA(kind):
+    def match(self, kind, value=None) -> Optional[Token]:
+        if self.peek().isA(kind, value):
             return self.pop()
         return None
 
