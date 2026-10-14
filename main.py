@@ -597,9 +597,9 @@ class Assembler:
             if not layout.banked:
                 raise AssemblerException(layout_name, f"Cannot assign a bank to an unbanked section")
             if bank < layout.bank_min:
-                raise AssemblerException(pkey, f"Bank number need to be at least {layout.bank_min}")
+                raise AssemblerException(layout_name, f"Bank number need to be at least {layout.bank_min}")
             if layout.bank_max is not None and bank >= layout.bank_max:
-                raise AssemblerException(pkey, f"Bank number needs to be lower then {layout.bank_max}")
+                raise AssemblerException(layout_name, f"Bank number needs to be lower then {layout.bank_max}")
 
         section = Section(layout, name, address, bank)
         self.__sections.append(section)
